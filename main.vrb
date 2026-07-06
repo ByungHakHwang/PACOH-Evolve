@@ -1,0 +1,18 @@
+\frametitle{Example 1: the priority function}
+  \begin{block}{What FunSearch evolves}
+  \scriptsize
+  \begin{verbatim}
+  def priority(v: tuple[int, ...], n: int) -> float:
+    """Returns the priority of vector v.
+    The cap set is built by adding vectors that
+    do not create a 3-term AP, in order of priority.
+    """
+    return 0.0
+  \end{verbatim}
+  \normalsize
+  \end{block}
+  \pause
+  \vspace{.2cm}
+
+  From this trivial seed, FunSearch evolves a heuristic that --
+  run greedily -- produces a record cap set.

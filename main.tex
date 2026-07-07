@@ -313,16 +313,16 @@
     \setlength{\itemsep}{.12cm}
     \item[$\bullet$] \bemph{Cap set} -- largest subset of \( (\ZZ/3\ZZ)^n \)
       with no 3 points on a line.
-    \item[$\bullet$] \bemph{Ramsey} -- 2-coloring of \( K_N \) with no
-      monochromatic clique.
-    \item[$\bullet$] \bemph{Matrix multiplication} -- tensor decomposition
-      of smallest rank.
+    \item[$\bullet$] \bemph{Traveling salesman} -- shortest tour visiting
+      \( n \) cities.
+    \item[$\bullet$] \bemph{Circle packing} -- pack \( n \) circles in a unit
+      square, maximizing the sum of radii.
   \end{itemize}
   \pause
   \vspace{.25cm}
 
-  Each carries a natural \emph{fitness} -- set size, \# cliques, rank
-  \(\Rightarrow\) a GA can search for the optimum.
+  Each carries a natural \emph{fitness} -- set size, tour length, sum of
+  radii \(\Rightarrow\) a GA can search for the optimum.
   \pause
   \vspace{.25cm}
 
@@ -362,39 +362,24 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Asking an LLM to prove a theorem}
-  Late 2022 -- a mathematician asks ChatGPT:
-  \emph{``Prove there are infinitely many primes.''}
-  \pause
-  \vspace{.15cm}
-
-  \begin{quote}\footnotesize\itshape
-    Suppose \( p_1, \ldots, p_n \) are all the primes. \\
-    Let \( N = p_1 p_2 \cdots p_n + 1 \). \\
-    \textcolor{red}{``\( N \) is not \( 1 \), so it cannot be a composite number.''}
-  \end{quote}
-  \pause
-  \vspace{.05cm}
-
-  \begin{itemize}
-    \setlength{\itemsep}{.05cm}
-    \item[$\bullet$] Looks like Euclid -- but the red step is a \remph{non sequitur}: \\
-      \( N \ne 1 \) does not preclude \( N \) being composite.
-    \pause
-    \item[$\bullet$] Tao: \emph{``persuasively mimics; nonsense on inspection.''}
-  \end{itemize}
-  % \vspace{.1cm}
-
-  % \scriptsize\textcolor{gray}{Hacker News \#33867878 (Dec 2022).}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
   \frametitle{LLMs hallucinate \ldots}
   \pause
-  LLMs \remph{confidently produce nonsense} -- as anyone who has tried
-  ChatGPT for math knows.
+  Ask an LLM for a proof. The answer may \emph{look} like mathematics:
+  \pause
+  \vspace{.2cm}
+
+  \begin{itemize}
+    \setlength{\itemsep}{.1cm}
+    \item[$\bullet$] correct terminology,
+    \pause
+    \item[$\bullet$] familiar proof structure,
+    \pause
+    \item[$\bullet$] one wrong logical step.
+  \end{itemize}
+  \pause
+  \vspace{.2cm}
+
+  One false step is enough to break the whole proof.
   \pause
   \vspace{.3cm}
 
@@ -449,10 +434,10 @@
       \;}
     \]
   \end{center}
-  \vspace{.5cm}
-  \pause
+  % \vspace{.5cm}
+  % \pause
 
-  The rest of this talk: variations on this recipe.
+  % The rest of this talk: variations on this recipe.
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -502,7 +487,7 @@
   \vspace{.2cm}
 
   \begin{center}
-    Repeat \(\sim 10^6 \) times.
+    Repeat \(\sim 10^5 \) times.
   \end{center}
 \end{frame}
 
@@ -519,11 +504,11 @@
     \item[$\bullet$] \bemph{Cap set.} Evolve a function that decides which
       vectors to add next.
       \pause
-    \item[$\bullet$] \bemph{Ramsey graphs.} Evolve a search algorithm that
-      builds large graphs avoiding monochromatic cliques.
+    \item[$\bullet$] \bemph{Traveling salesman.} Evolve a heuristic that
+      constructs short tours.
       \pause
-    \item[$\bullet$] \bemph{Matrix multiplication.} Evolve an entire
-      gradient-based solver for low-rank tensor decomposition.
+    \item[$\bullet$] \bemph{Circle packing.} Evolve a constructor that places
+      circles in the square.
   \end{itemize}
   \pause
   \vspace{.3cm}

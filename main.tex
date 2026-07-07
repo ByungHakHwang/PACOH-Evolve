@@ -303,21 +303,33 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Where classical GAs struggle}
-  Classical GAs: great for \emph{numeric vectors} or \emph{bit strings}.
+  \frametitle{Genetic algorithms for mathematics}
+  Many problems in mathematics: \emph{construct the best object} of a
+  given kind.
   \pause
-  \vspace{.3cm}
-
-  But what if a candidate is a piece of \remph{code}?
-  \vspace{.2cm}
+  \vspace{.25cm}
 
   \begin{itemize}
-    \item[$\bullet$] Random byte mutation -- rarely produces valid syntax. \pause
-    \item[$\bullet$] Even when it compiles, semantic gain by chance is hopeless. \pause
-    \item[$\bullet$] Search space: astronomically larger than for numeric vectors.
+    \setlength{\itemsep}{.12cm}
+    \item[$\bullet$] \bemph{Cap set} -- largest subset of \( (\ZZ/3\ZZ)^n \)
+      with no 3 points on a line.
+    \item[$\bullet$] \bemph{Ramsey} -- 2-coloring of \( K_N \) with no
+      monochromatic clique.
+    \item[$\bullet$] \bemph{Matrix multiplication} -- tensor decomposition
+      of smallest rank.
   \end{itemize}
   \pause
-  \vspace{.3cm}
+  \vspace{.25cm}
+
+  Each carries a natural \emph{fitness} -- set size, \# cliques, rank
+  \(\Rightarrow\) a GA can search for the optimum.
+  \pause
+  \vspace{.25cm}
+
+  But the candidate is a \remph{program} that builds the object, and
+  classical GAs mutate \emph{at random} -- on code, hopeless.
+  \pause
+  \vspace{.2cm}
 
   \begin{center}
     \emph{What if mutation could be \remph{smart}?}

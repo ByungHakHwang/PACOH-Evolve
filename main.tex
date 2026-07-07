@@ -52,7 +52,7 @@
 \newcommand\remph[1]{\emph{\textcolor{red}{#1}}}
 \newcommand\bemph[1]{\emph{\textcolor{blue}{#1}}}
 
-\title[AI in Mathematical Discovery]{Exploring Evolve-Style Coding Agents}
+\title{Exploring Evolve-Style Coding Agents}
 \author{Byung-Hak Hwang}
 \institute[KIAS]{Center for AI and Natural Sciences, KIAS}
 \date[PACOH]{PACOH \\ \today}
@@ -199,7 +199,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Three flavors of ``AI for mathematics''}
+  \frametitle{AI for mathematics}
   \pause
   \begin{center}
     \renewcommand{\arraystretch}{1.1}
@@ -209,17 +209,17 @@
       \toprule
       \textbf{Pattern recognizer} & \textbf{Coding agent} & \textbf{Automated theorem prover} \\
       \midrule
-      Train a model for each problem \newline (Transformer, GNN, RL, \ldots)
+      Train a model for each problem % \newline (Transformer, GNN, RL, \ldots)
         & \remph{FunSearch}, \newline \remph{AlphaEvolve}
         & AlphaProof, \newline Gemini Deep Think, \newline Aristotle \\
       \midrule
       Detects hidden patterns; suggests conjectures
         & Searches for \emph{algorithms} that build mathematical objects
-        & Produces machine-checked proofs in Lean / Coq \\
+        & LLM generates proofs and proof strategies \\
       \midrule
-      Hypercube decomposition (Kazhdan--Lusztig); Murmurations of elliptic curves
-        & Cap set, Ramsey, matrix multiplication, \ldots
-        & Gold-medal performance at IMO 2024 \\
+      Hypercube decomposition, Murmurations of elliptic curves
+        & Cap set, Ramsey number, Matrix multiplication
+        & Unit distance conjecture \\
       \bottomrule
     \end{tabular}}
   \end{center}

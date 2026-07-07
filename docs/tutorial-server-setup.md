@@ -64,6 +64,11 @@ gpt-oss:20b
 참가자 노트북에서는 브라우저만 필요하다. OpenEvolve 실행, evaluator 실행,
 visualization용 best program 실행, Ollama 호출은 모두 서버에서 일어난다.
 
+이 저장소에는 위 구조의 실제 fallback dashboard가 `tutorial/server/`에 들어 있다.
+설치와 실행 절차는 [tutorial/server/README.md](../tutorial/server/README.md)를
+기준으로 한다. 운영 개요는 [tutorial-live-dashboard.md](tutorial-live-dashboard.md)에
+따로 정리했다.
+
 ## 현재 서버에서 확인한 상태
 
 실험 중 확인한 서버 상태는 다음과 같다.
@@ -352,23 +357,22 @@ elif score_mode == "intentionally_bad_reported_sum":
 ```text
 problem:
   - circle_packing
-  - tsp_tour_minimization
+  - tsp
+  - no_isosceles
 ```
 
 서버 준비물:
 
 ```text
-~/openevolve_tutorial/problems/circle_packing/
-  initial_program.py.j2
-  evaluator.py.j2
-  config.yaml.j2
-  visualize.py
+tutorial/server/tutorial_server/problems.py
+  - circle_packing initial/evaluator/config template
+  - tsp initial/evaluator/config template
+  - no_isosceles initial/evaluator/config template
 
-~/openevolve_tutorial/problems/tsp_tour_minimization/
-  initial_program.py.j2
-  evaluator.py.j2
-  config.yaml.j2
-  visualize.py
+tutorial/server/tutorial_server/checkpoints.py
+  - stable checkpoint reader
+  - best_program.py subprocess executor
+  - visualization data extractor for all three problem interfaces
 ```
 
 OpenEvolve problem template은 공통적으로 세 파일을 만든다.
@@ -379,8 +383,9 @@ run_dir/evaluator.py
 run_dir/config.yaml
 ```
 
-dashboard는 problem별 `visualize.py`를 호출해 그림을 만든다. circle packing은
-원을 그리고, TSP는 점과 tour path를 그린다.
+dashboard는 `checkpoints.py`로 best program output을 JSON 형태로 추출한 뒤
+Streamlit 앱에서 그린다. circle packing은 원을 그리고, TSP는 점과 tour path를
+그리고, no-isosceles는 grid point subset을 그린다.
 
 ## 3. Ollama Health Check
 

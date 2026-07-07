@@ -1,6 +1,0 @@
-\beamer@sectionintoc {1}{AI for mathematics}{6}{0}{1}
-\beamer@sectionintoc {2}{From genetic algorithms to AlphaEvolve}{9}{0}{2}
-\beamer@sectionintoc {3}{Inside AlphaEvolve}{17}{0}{3}
-\beamer@sectionintoc {4}{Discoveries}{21}{0}{4}
-\beamer@sectionintoc {5}{Limitation and message}{37}{0}{5}
-\beamer@sectionintoc {6}{Try it yourself}{40}{0}{6}

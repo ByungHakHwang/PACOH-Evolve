@@ -25,4 +25,4 @@ openevolve/
 *.vrb
 *.bbl
 *.blg
-*.pdf
+/*.pdf

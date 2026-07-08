@@ -216,21 +216,13 @@ def render_submit_form(manager: JobManager):
         if problem_type == "circle_packing":
             left, right = st.columns(2)
             with left:
-                custom_n = st.checkbox("Enter PACKING_N manually")
-                if custom_n:
-                    packing_n = st.number_input("PACKING_N", min_value=4, max_value=40, value=16, step=1)
-                else:
-                    packing_n = st.selectbox("PACKING_N", CIRCLE_N_OPTIONS, index=CIRCLE_N_OPTIONS.index(16))
+                packing_n = st.selectbox("PACKING_N", CIRCLE_N_OPTIONS, index=CIRCLE_N_OPTIONS.index(16))
             with right:
                 score_mode = st.selectbox("Score mode", CIRCLE_SCORE_MODES, index=CIRCLE_SCORE_MODES.index("actual_sum_minus_penalty"))
         elif problem_type == "tsp":
             left, mid, right = st.columns(3)
             with left:
-                custom_n = st.checkbox("Enter TSP_N manually")
-                if custom_n:
-                    tsp_n = st.number_input("TSP_N", min_value=5, max_value=80, value=20, step=1)
-                else:
-                    tsp_n = st.selectbox("TSP_N", TSP_N_OPTIONS, index=TSP_N_OPTIONS.index(20))
+                tsp_n = st.selectbox("TSP_N", TSP_N_OPTIONS, index=TSP_N_OPTIONS.index(20))
             with mid:
                 tsp_seed = st.number_input("TSP_SEED", min_value=0, max_value=100000, value=0, step=1)
             with right:
@@ -238,27 +230,15 @@ def render_submit_form(manager: JobManager):
         elif problem_type == "no_isosceles":
             left, right = st.columns(2)
             with left:
-                custom_n = st.checkbox("Enter NOISO_N manually")
-                if custom_n:
-                    noiso_n = st.number_input("NOISO_N", min_value=4, max_value=14, value=8, step=1)
-                else:
-                    noiso_n = st.selectbox("NOISO_N", NOISO_N_OPTIONS, index=NOISO_N_OPTIONS.index(8))
+                noiso_n = st.selectbox("NOISO_N", NOISO_N_OPTIONS, index=NOISO_N_OPTIONS.index(8))
             with right:
                 noiso_score_mode = st.selectbox("Score mode", NOISO_SCORE_MODES, index=NOISO_SCORE_MODES.index("size_minus_penalty"))
         else:
             left, mid_left, mid_right, right = st.columns(4)
             with left:
-                custom_n = st.checkbox("Enter FACILITY_N manually")
-                if custom_n:
-                    facility_n = st.number_input("FACILITY_N", min_value=10, max_value=300, value=50, step=5)
-                else:
-                    facility_n = st.selectbox("FACILITY_N", FACILITY_N_OPTIONS, index=FACILITY_N_OPTIONS.index(50))
+                facility_n = st.selectbox("FACILITY_N", FACILITY_N_OPTIONS, index=FACILITY_N_OPTIONS.index(50))
             with mid_left:
-                custom_k = st.checkbox("Enter FACILITY_K manually")
-                if custom_k:
-                    facility_k = st.number_input("FACILITY_K", min_value=1, max_value=20, value=5, step=1)
-                else:
-                    facility_k = st.selectbox("FACILITY_K", FACILITY_K_OPTIONS, index=FACILITY_K_OPTIONS.index(5))
+                facility_k = st.selectbox("FACILITY_K", FACILITY_K_OPTIONS, index=FACILITY_K_OPTIONS.index(5))
             with mid_right:
                 facility_seed = st.number_input("FACILITY_SEED", min_value=0, max_value=100000, value=0, step=1)
             with right:

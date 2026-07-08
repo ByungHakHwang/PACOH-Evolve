@@ -19,17 +19,22 @@ def test_problem_choice_controls_submit_form_contents():
     assert '"facility_location"' in source
 
 
-def test_manual_size_labels_name_the_parameter():
+def test_manual_size_mode_is_not_exposed():
     source = Path("tutorial/server/streamlit_app.py").read_text()
 
-    assert 'st.checkbox("Enter PACKING_N manually")' in source
-    assert 'st.checkbox("Enter TSP_N manually")' in source
-    assert 'st.checkbox("Enter NOISO_N manually")' in source
-    assert 'st.checkbox("Enter FACILITY_N manually")' in source
-    assert 'st.checkbox("Enter FACILITY_K manually")' in source
-    assert "Custom circle count" not in source
-    assert "Custom TSP city count" not in source
-    assert "Custom grid size" not in source
+    for forbidden in [
+        "manually",
+        "custom_",
+        "Custom circle count",
+        "Custom TSP city count",
+        "Custom grid size",
+        'st.number_input("PACKING_N"',
+        'st.number_input("TSP_N"',
+        'st.number_input("NOISO_N"',
+        'st.number_input("FACILITY_N"',
+        'st.number_input("FACILITY_K"',
+    ]:
+        assert forbidden not in source
 
 
 def test_facility_location_controls_are_available():

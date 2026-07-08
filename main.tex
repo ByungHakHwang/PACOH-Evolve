@@ -1,5 +1,5 @@
-% \documentclass{beamer}
-\documentclass[handout]{beamer}
+\documentclass{beamer}
+% \documentclass[handout]{beamer}
 
 % \usetheme{Antibes}
 % \usetheme{Berlin}
@@ -52,18 +52,18 @@
 \newcommand\remph[1]{\emph{\textcolor{red}{#1}}}
 \newcommand\bemph[1]{\emph{\textcolor{blue}{#1}}}
 
-\title{Exploring Evolve-Style Coding Agents}
+\title{Exploring Evolutionary Coding Agents}
 \author{Byung-Hak Hwang}
 \institute[KIAS]{Center for AI and Natural Sciences, KIAS}
 \date[PACOH]{PACOH \\ \today}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\AtBeginSection[]{%
-\begin{frame}
-    \tableofcontents[currentsection, subsectionstyle=show/show/hide]
-\end{frame}
-}
+% \AtBeginSection[]{%
+% \begin{frame}
+%     \tableofcontents[currentsection, subsectionstyle=show/show/hide]
+% \end{frame}
+% }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -144,49 +144,28 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{What about \( 4 \times 4 \) matrices?}
-  Apply Strassen \emph{recursively}: a \( 4 \times 4 \) matrix as a
-  \( 2 \times 2 \) block of \( 2 \times 2 \) blocks.
-  \pause
-  \vspace{.3cm}
-
-  Each block: 7 multiplications (Strassen).
-  Outer level: 7 of those (Strassen again):
-  \[
-    7 \times 7 \;=\; \textcolor{red}{49} \text{ multiplications.}
-  \]
-  \pause
-  \vspace{.3cm}
-
-  \begin{center}
-    \large Can we do better than 49?
-  \end{center}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
   \frametitle{A 56-year mystery}
+  A \( 4 \times 4 \) matrix is a \( 2 \times 2 \) block of \( 2 \times 2 \)
+  blocks \(\Rightarrow\) Strassen twice: \( 7 \times 7 = \textcolor{red}{49} \).
   \pause
-
-  For \remph{56 years} (1969--2025): nobody knew whether 49 could be improved
-  over a characteristic-0 field (e.g.\ \(\RR\), \(\CC\)).
   \vspace{.3cm}
+
+  For 56 years, nobody beat 49 for \( 4 \times 4 \) complex matrix multiplication.
   \pause
+  \vspace{.3cm}
 
   \begin{AlphaEvolveResult}
-    Two \( 4 \times 4 \) complex matrices can be multiplied with
-    \remph{48 multiplications}.
+    Two \( 4 \times 4 \) complex matrices: \remph{48 multiplications}.
   \end{AlphaEvolveResult}
   \pause
   \vspace{.3cm}
 
-  Found not by a human, but by an AI system: \bemph{AlphaEvolve}.
-  \vspace{.3cm}
+  Found by an AI system: \bemph{AlphaEvolve} (2025).
   \pause
+  \vspace{.2cm}
 
   \begin{center}
-    \large Today's question: \emph{how is this possible?}
+    \large \emph{How is this possible?}
   \end{center}
 \end{frame}
 
@@ -207,15 +186,15 @@
     \resizebox{\textwidth}{!}{%
     \begin{tabular}{|p{3.6cm}|p{2.8cm}|p{3.4cm}|}
       \toprule
-      \textbf{Pattern recognizer} & \textbf{Coding agent} & \textbf{Automated theorem prover} \\
+      \textbf{Pattern recognizer} & \textbf{Coding agent} & \textbf{Proof agent} \\
       \midrule
-      Train a model for each problem % \newline (Transformer, GNN, RL, \ldots)
+      Transformers, GNNs, RL
         & \remph{FunSearch}, \newline \remph{AlphaEvolve}
         & AlphaProof, \newline Gemini Deep Think, \newline Aristotle \\
       \midrule
       Detects hidden patterns; suggests conjectures
         & Searches for \emph{algorithms} that build mathematical objects
-        & LLM generates proofs and proof strategies \\
+        & Generates proof attempts and strategies \\
       \midrule
       Hypercube decomposition, Murmurations of elliptic curves
         & Cap set, Ramsey number, Matrix multiplication
@@ -223,9 +202,9 @@
       \bottomrule
     \end{tabular}}
   \end{center}
-  % \pause
+  \pause
 
-  % Today we focus on the \remph{middle column}.
+  Today we focus on the \remph{middle column}.
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -321,8 +300,8 @@
   \pause
   \vspace{.25cm}
 
-  Each carries a natural \emph{fitness} -- set size, tour length, sum of
-  radii \(\Rightarrow\) a GA can search for the optimum.
+  In each case, a candidate can be scored automatically -- by set size,
+  tour length, or sum of radii \(\Rightarrow\) GA can search for the optimum.
   \pause
   \vspace{.25cm}
 
@@ -340,7 +319,7 @@
 
 \begin{frame}
   \frametitle{LLMs as a smart mutation operator}
-  Modern \bemph{LLMs} (GPT-5, Claude, Gemini, \ldots) -- read code,
+  Modern \bemph{LLMs} (GPT, Claude, Gemini, \ldots) -- read code,
   understand intent, propose changes.
   \pause
   \vspace{.3cm}
@@ -398,12 +377,17 @@
 
 \begin{frame}
   \frametitle{The role of the evaluator}
+  A natural-language proof can't be checked automatically -- but a
+  \remph{program can be run}.
+  \pause
+  \vspace{.25cm}
+
   \begin{KeyIdea}
     The LLM writes a piece of \emph{code}. \\
     The code is then \remph{run, scored, and verified deterministically}.
   \end{KeyIdea}
   \pause
-  \vspace{.3cm}
+  \vspace{.25cm}
 
   \begin{itemize}
     \item[$\bullet$] Hallucinated code: fails or scores poorly.
@@ -414,9 +398,12 @@
       \emph{not} the LLM.
   \end{itemize}
   \pause
-  \vspace{.3cm}
+  \vspace{.25cm}
 
-  Central design principle of FunSearch / AlphaEvolve.
+  \begin{center}
+    \emph{The LLM proposes executable programs; the \remph{evaluator} decides
+      which survive.}
+  \end{center}
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -428,7 +415,7 @@
     \[
       \boxed{\;
         \begin{aligned}
-          \text{AlphaEvolve} \;=\; & \text{LLM (mutation)} \,+\, \text{Evaluator (selection)} \\
+          \text{Evolutionary Coding agent} \;=\; & \text{LLM (mutation)} \,+\, \text{Evaluator (selection)} \\
           & {} +\, \text{Evolution loop}
         \end{aligned}
       \;}
@@ -501,14 +488,14 @@
   \vspace{.3cm}
 
   \begin{itemize}
-    \item[$\bullet$] \bemph{Cap set.} Evolve a function that decides which
-      vectors to add next.
+    \item[$\bullet$] \bemph{Cap set.} Evolve a priority function that decides
+      which vector to add next.
       \pause
-    \item[$\bullet$] \bemph{Traveling salesman.} Evolve a heuristic that
-      constructs short tours.
+    \item[$\bullet$] \bemph{Ramsey.} Evolve a search heuristic that builds
+      large graphs avoiding monochromatic cliques.
       \pause
-    \item[$\bullet$] \bemph{Circle packing.} Evolve a constructor that places
-      circles in the square.
+    \item[$\bullet$] \bemph{Matrix multiplication.} Evolve the solver code for
+      low-rank tensor decomposition.
   \end{itemize}
   \pause
   \vspace{.3cm}
@@ -528,7 +515,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Example 1: the Cap Set problem}
+  \frametitle{Example 1: Cap Set problem}
   \begin{prob}[Cap Set]
     Find the largest subset of \( (\ZZ/3\ZZ)^n \) containing no three
     elements \( a, b, c \) with \( a + b + c = 0 \).
@@ -543,32 +530,31 @@
     \item[$\bullet$] Dimension 8: previous record \emph{496}, stood
       $\sim 20$ years.
   \end{itemize}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 1: the Cap Set problem}
-  \begin{center}
-    \includegraphics[height=5cm]{FunSearch_Eval_Solve.png}
-  \end{center}
   \pause
-  FunSearch: cap set of size \remph{512} in dimension 8.
-  First improvement in 20 years; the program is \emph{human-readable}.
+  \vspace{.25cm}
+
+  \begin{center}
+    FunSearch (2023): \remph{512} in dim 8 -- first improvement in 20 years.
+  \end{center}
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 \begin{frame}[fragile]
   \frametitle{Example 1: the priority function}
-  \begin{block}{What FunSearch evolves}
-  \scriptsize
+  \begin{block}{The seed program}
+  % \scriptsize
+  % \begin{verbatim}
+  % def priority(v: tuple[int, ...], n: int) -> float:
+  %   """Returns the priority of vector v.
+  %   The cap set is built by adding vectors that
+  %   do not create a 3-term AP, in order of priority.
+  %   """
+  %   return 0.0
+  % \end{verbatim}
   \begin{verbatim}
   def priority(v: tuple[int, ...], n: int) -> float:
-    """Returns the priority of vector v.
-    The cap set is built by adding vectors that
-    do not create a 3-term AP, in order of priority.
-    """
     return 0.0
   \end{verbatim}
   \normalsize
@@ -578,6 +564,49 @@
 
   From this trivial seed, FunSearch evolves a heuristic that --
   run greedily -- produces a record cap set.
+  \pause
+  \vspace{.25cm}
+
+  \emph{Only the \texttt{priority} function evolves} -- the greedy loop
+  and the cap-set checker stay \bemph{human-written}.
+  \vspace{.12cm}
+
+  \emph{Evaluator:} build the set greedily, reject any 3-term AP,
+  return its size.
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]
+  \frametitle{Example 1: what FunSearch evolved}
+  What the loop turned the \texttt{return 0.0} seed into:
+  \vspace{.15cm}
+
+  \begin{block}{Evolved \texttt{priority} function (abridged)}
+  \scriptsize
+  \begin{verbatim}
+  def priority(v: tuple[int, ...], n: int) -> float:
+    score = n
+    zeros = v.count(0)
+    if zeros == 0:
+      score += n ** 2
+      if v[1] == v[-1]: score *= 1.5
+      if v[2] == v[-2]: score *= 1.5
+      if v[3] == v[-3]: score *= 1.5
+    else:
+      if v[1] == v[-1]: score *= 0.5
+      if v[2] == v[-2]: score *= 0.5
+    # ... then a loop scoring each coordinate ...
+    return score
+  \end{verbatim}
+  \normalsize
+  \end{block}
+  \pause
+  \vspace{.1cm}
+
+  Real, readable Python -- \emph{no human wrote it}. The
+  \remph{\(i \leftrightarrow -i\)} symmetry (\texttt{v[i]} vs \texttt{v[-i]})
+  is the clue that let humans \emph{understand} the size-512 set.
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -605,34 +634,53 @@
     \( s \backslash t \) & 3 & 4 & 5 & 6 \\
     \hline
     3 & 6 & 9 & 14 & 18 \\
-    4 &   & 18 & 25 & \( \in [36, 41] \) \\
-    5 &   &    & \remph{\( \in [43, 48] \)} & \\
+    4 &   & 18 & 25 & \( \in [36, 40] \) \\
+    5 &   &    & \remph{\( \in [43, 46] \)} & \\
   \end{tabular}
   \end{center}
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 \begin{frame}
-  \frametitle{Example 2: the small-Ramsey table}
-  Each entry: \emph{decades} of bespoke human computer searches.
+  \frametitle{Example 2: what evolves?}
+  \bemph{What evolves:} a \remph{graph-search program} \( p \), not a
+  graph directly. Each run returns \emph{two} graphs:
+  \begin{itemize}
+    \setlength{\itemsep}{.05cm}
+    \item[$\bullet$] \( G_1 \) -- a \emph{valid} candidate;
+    \item[$\bullet$] \( G_2 \) -- a larger \remph{near-miss} (the paper's
+      ``prospect'').
+  \end{itemize}
   \pause
+  \vspace{.25cm}
+
+  \bemph{Evaluator:}
+  \begin{itemize}
+    \setlength{\itemsep}{.05cm}
+    \item[$\bullet$] reject \( G_1 \) if it contains a forbidden \( K_r \)
+      or an independent \( s \)-set;
+    \item[$\bullet$] score \( |G_1| \), \emph{boosted} past the previous bound;
+    \item[$\bullet$] add a \remph{near-miss bonus} from \( G_2 \)'s few
+      violations.
+  \end{itemize}
+  \pause
+  \vspace{.25cm}
 
   \begin{center}
-    \includegraphics[height=4cm]{r44-14.png}
+    \emph{The surprise is not one graph -- it is one loop producing many
+    \remph{cell-specific} searchers.}
   \end{center}
-  \pause
-
-  Above: 2-coloring of \( K_{14} \), no monochromatic \( K_4 \).
-  Witness for \( R(4,4) > 14 \).
 \end{frame}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
   \frametitle{Example 2: AlphaEvolve takes a single shot}
+  Each classical entry: \emph{decades} of bespoke human search.
   \emph{Nagda et al.}\ (\texttt{arXiv:2603.09172}): AlphaEvolve as a
-  \remph{single meta-algorithm} against the Ramsey table.
+  \remph{single meta-algorithm}, raising \emph{lower bounds} across the table.
   \pause
   \vspace{.2cm}
 
@@ -678,8 +726,8 @@
     \vspace{.6cm}
 
     \normalsize
-    First improvement over Strassen \emph{after 56 years}, over any
-    field of characteristic 0.
+    First improvement over Strassen \emph{after 56 years}, for
+    complex matrix multiplication.
   \end{center}
 \end{frame}
 
@@ -694,10 +742,11 @@
 
   \begin{itemize}
     \item[$\bullet$] \bemph{What evolves:} the solver's \emph{code} --
-      initializer, loss, optimizer.
+      how it starts, what it scores, how it improves.
       \pause
     \item[$\bullet$] \bemph{Evaluator:} run on the \( 4 \times 4 \) matmul
-      tensor; return the rank achieved.
+      tensor; return the rank -- and \remph{verify it exactly} (round the
+      coefficients, check the identity).
       \pause
     \item[$\bullet$] \bemph{Trick discovered:} \emph{complex} coefficients
       with magic cancellations.
@@ -710,232 +759,63 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{frame}
-  \frametitle{Beyond \( 4 \times 4 \): AlphaEvolve in Google's compute stack}
-  Same agent, four \emph{separate} engineering problems.
-  \pause
-  \vspace{.3cm}
+% \begin{frame}
+%   \frametitle{Beyond \( 4 \times 4 \): AlphaEvolve in Google's compute stack}
+%   Same agent, four \emph{separate} engineering problems.
+%   \pause
+%   \vspace{.3cm}
 
-  \begin{itemize}
-    \item[$\bullet$] Evolved matmul kernel: \remph{\( 23\% \) faster} on
-      Gemini training hardware. $\sim 1\%$ of total training time saved.
-      \pause
-    \item[$\bullet$] Evolved scheduler: recovers \remph{\( 0.7\% \)} of
-      Google's worldwide compute.
-      \pause
-    \item[$\bullet$] Evolved register-allocation hint: \remph{\( 32\% \)}
-      shorter FlashAttention runtime.
-  \end{itemize}
-  \pause
-  \vspace{.3cm}
+%   \begin{itemize}
+%     \item[$\bullet$] Evolved matmul kernel: \remph{\( 23\% \) faster} on
+%       Gemini training hardware. $\sim 1\%$ of total training time saved.
+%       \pause
+%     \item[$\bullet$] Evolved scheduler: recovers \remph{\( 0.7\% \)} of
+%       Google's worldwide compute.
+%       \pause
+%     \item[$\bullet$] Evolved register-allocation hint: \remph{\( 32\% \)}
+%       shorter FlashAttention runtime.
+%   \end{itemize}
+%   \pause
+%   \vspace{.3cm}
 
-  Pure mathematics and industrial impact, from one system.
-\end{frame}
+%   Pure mathematics and industrial impact, from one system.
+% \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 4d. Kakeya problem (climax) --- Tao et al.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 4d. Bruhat order --- Williamson et al. (beyond optimization)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Example 4: the Kakeya needle problem}
-  \begin{prob}[Kakeya, 1917]
-    Can a unit needle be rotated in the plane while sweeping out an
-    \remph{arbitrarily small} area?
+  \frametitle{Example 4: beyond optimization}
+  Every example so far \emph{optimized a number} -- size, rank, tour length.
+  What about a \remph{structural} question?
+  \pause
+  \vspace{.25cm}
+
+  \begin{prob}[Ellenberg et al., 2026]
+    Find a large \bemph{boolean interval} (a poset hypercube) inside the
+    \bemph{Bruhat order} of the symmetric group \( S_n \).
   \end{prob}
   \pause
-  \vspace{.1cm}
-
-  \begin{center}
-    \includegraphics[height=3.4cm]{kakeya_needle_2D_triangle.png}
-  \end{center}
-  \pause
-  \vspace{-.05cm}
+  \vspace{.25cm}
 
   \begin{itemize}
-    \setlength{\itemsep}{.05cm}
-    \item[$\bullet$] Yes (Besicovitch, 1928): \emph{measure-zero} sets exist.
-    \item[$\bullet$] \bemph{Kakeya set}: contains a unit segment in every direction.
-    \item[$\bullet$] \bemph{Kakeya conjecture}: \( \dim_H(K) = d \) in \( \RR^d \).
-      \quad (3D: Wang--Zahl, 2025.)
-  \end{itemize}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 4: from \(\RR^d\) to \(\FF_q^d\)}
-  Same combinatorics, finite stage.
-  \pause
-  \vspace{.2cm}
-
-  \begin{prob}[finite field Kakeya]
-    Let \( \FF_q \) be a finite field, \( d \ge 1 \). A \bemph{Kakeya set}
-    \( K \subseteq \FF_q^d \) contains an entire \emph{line} in every
-    direction. \\
-    Let \( C^K(d, q) \) be the minimum size of \( K \).
-  \end{prob}
-  \pause
-  \vspace{.1cm}
-
-  \begin{itemize}
-    \setlength{\itemsep}{.1cm}
-    \item[$\bullet$] \bemph{Dvir (2008)}, polynomial method:
-      \( C^K(d, q) \ge c_d \, q^d \).
-    \pause
-    \item[$\bullet$] Best known upper bound (Bukh--Chao):
-      \[
-        C^K(d, q) \;\le\; \frac{1}{2^{d-1}}\, q^d + O(q^{d-1}).
-      \]
-    \pause
-    \item[$\bullet$] \emph{Open}: exact constants and \remph{lower-order} terms.
-  \end{itemize}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 4: a generalizer, not just a finder}
-  Two ways to use such a system:
-  \pause
-  \vspace{.2cm}
-
-  \begin{itemize}
-    \setlength{\itemsep}{.15cm}
-    \item[$\bullet$] \bemph{Search mode} -- evolve a heuristic that finds
-      the best object for a single \( q \).
-    \pause
-    \item[$\bullet$] \bemph{Generalizer mode} -- evolve a Python function
-      that, \emph{given any prime \( p \)}, outputs an explicit Kakeya set.
+    \setlength{\itemsep}{.12cm}
+    \item[$\bullet$] AlphaEvolve returned a \emph{recipe}: choose the
+      \remph{dyadically well-distributed} permutations.
+      \pause
+    \item[$\bullet$] The authors then proved these permutations form a
+      hypercube of dimension \( m \cdot 2^{m-1} \) in \( S_{2^m} \).
   \end{itemize}
   \pause
   \vspace{.2cm}
 
-  \begin{KeyIdea}
-    Score = \emph{average} normalized size across \emph{many} primes \( p \). \\
-    The same code must work simultaneously for all of them. \\
-    \(\Rightarrow\) Surviving code \remph{must} be a formula in \( p \).
-  \end{KeyIdea}
-  \pause
-  \vspace{.2cm}
-
   \begin{center}
-    Output: a \remph{closed-form formula} -- not a numerical optimum.
+    \emph{AI suggests the pattern. The mathematicians prove the theorem.}
   \end{center}
 \end{frame}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 4: the discovery (\(d = 3\))}
-  \begin{AlphaEvolveResult}
-    For every prime \( p \equiv 1 \pmod{4} \),
-    \[
-      C^K(3, p) \;\le\; \tfrac{1}{4} p^3 + \tfrac{7}{8} p^2 - \tfrac{1}{8}.
-    \]
-  \end{AlphaEvolveResult}
-  \pause
-  \vspace{.1cm}
-
-  Explicit construction
-  (\( g = \tfrac{p-1}{4},\ S = \) quadratic residues in \( \FF_p \)):
-  \[
-    \Big\{ \big(x,\ \tfrac{q_1+q_2}{2} - x^2 - g,\ \tfrac{q_1-q_2}{2}\big)
-      : x \in \FF_p,\ q_1, q_2 \in S \Big\} \;\cup\; \cdots
-  \]
-  \pause
-  \vspace{.1cm}
-
-  \begin{itemize}
-    \item[$\bullet$] Bukh--Chao baseline:
-      \( \tfrac{1}{4} p^3 + \tfrac{7}{8} p^2 + \textcolor{red}{O(p)} \).
-    \pause
-    \item[$\bullet$] AlphaEvolve: \emph{exact} cubic and quadratic coefficients,
-      \remph{exact} lower-order term \( -\tfrac{1}{8} \).
-  \end{itemize}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 4: from pattern to formal proof}
-  AlphaEvolve discovers; \emph{but who proves the formula?}
-  \pause
-  \vspace{.15cm}
-
-  \begin{center}
-    \begin{tikzpicture}[
-      >={Latex[length=2.5mm]},
-      node distance=0.5cm and 0.4cm,
-      every node/.append style={font=\footnotesize},
-      box/.style={rectangle, rounded corners=2pt, draw, semithick,
-                  minimum height=1.0cm, minimum width=2.7cm, align=center,
-                  fill=white},
-      mbox/.style={box, fill=blue!12},
-      hbox/.style={box, fill=red!12},
-    ]
-      \node[hbox] (AE) {\remph{AlphaEvolve} \\ \scriptsize discovers code};
-      \node[mbox, right=of AE] (DT) {\bemph{Deep Think} \\ \scriptsize natural-language proof};
-      \node[mbox, right=of DT] (AP) {\bemph{AlphaProof} \\ \scriptsize Lean formal proof};
-      \draw[->,semithick] (AE) -- (DT);
-      \draw[->,semithick] (DT) -- (AP);
-    \end{tikzpicture}
-  \end{center}
-  \pause
-  \vspace{.1cm}
-
-  \begin{itemize}
-    \setlength{\itemsep}{.05cm}
-    \item[$\bullet$] \( d = 3 \): \remph{all three steps automated}.
-      Proof uses only \texttt{mathlib} number theory.
-    \pause
-    \item[$\bullet$] \( d = 4 \): Deep Think reveals \emph{elliptic curves};
-      AlphaProof gives up. Humans verify by hand.
-    \pause
-    \item[$\bullet$] \( d = 5 \):
-      \( \tfrac{1}{16} p^5 + \tfrac{47}{128} p^4 + \tfrac{177}{256} p^3 + O(p^{5/2}) \),
-      verified by hand.
-  \end{itemize}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 4: from AI to new theorems}
-  Two follow-up papers \emph{by Tao alone}, both inspired by AlphaEvolve:
-  \pause
-  \vspace{.15cm}
-
-  \begin{itemize}
-    \setlength{\itemsep}{.1cm}
-    \item[$\bullet$] \bemph{Nikodym sets} -- AlphaEvolve's complicated first
-      try \(\to\) human simplification \(\to\) new asymptotic
-      \[
-        C^N(d, p) \;\le\; p^d - \big( \tfrac{d-2}{\log 2} + 1 + o(1) \big)\, p^{d-1} \log p.
-      \]
-    \pause
-    \item[$\bullet$] \bemph{Arithmetic Kakeya}: AlphaEvolve's distributions
-      resemble \emph{discrete Gaussians}:
-  \end{itemize}
-  \begin{center}
-    \includegraphics[height=1.9cm]{arithmetic_kakeya_distributions.png}
-  \end{center}
-  \pause
-  \vspace{-.1cm}
-
-  \(\to\) New theorem of Tao:
-  \(
-    C\big(\{0,1,\infty\}; \tfrac{a}{b}\big)
-    = 2 - \Theta\big(\tfrac{1}{\log(2 + |a| + |b|)}\big).
-  \)
-  \pause
-  \vspace{.05cm}
-
-  \begin{center}
-    \emph{AI suggested the pattern. The mathematicians proved the theorem.}
-  \end{center}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% § 6. Limitations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -947,8 +827,9 @@
   \frametitle{What AlphaEvolve cannot (yet) do}
   \pause
   \begin{itemize}
-    \item[$\bullet$] \bemph{No proofs.} Constructions and heuristics, not
-      theorems. (Tao Kakeya: Deep Think + AlphaProof close the gap.)
+    \item[$\bullet$] \bemph{No proofs.} AlphaEvolve \emph{itself} outputs
+      constructions and heuristics.
+      % -- separate systems (Deep Think, AlphaProof) must prove them.
       \pause
       \vspace{.2cm}
     \item[$\bullet$] \bemph{Needs an evaluator.} No automatic score
@@ -970,20 +851,19 @@
   \pause
   \begin{center}
     \large
-    AlphaEvolve does \remph{not} replace mathematicians. \\
+    Such coding agents do \remph{not} replace mathematicians. \\
     \pause
     \vspace{.4cm}
-    It is a new \bemph{collaborator} in the loop.
+    They are a new kind of \bemph{collaborator} in the loop.
   \end{center}
   \pause
   \vspace{.5cm}
 
-  Tao's finite-field Kakeya -- the prototype:
+  Williamson's Bruhat hypercubes -- the prototype:
   \begin{itemize}
-    \item[$\bullet$] AI: closed-form Kakeya sets, all primes at once.
+    \item[$\bullet$] AI: a recipe for large hypercube intervals in \( S_n \).
       \pause
-    \item[$\bullet$] Humans: spotted the structure, formalized the proof,
-      proved new theorems.
+    \item[$\bullet$] Humans: recognized the structure and proved the theorem.
   \end{itemize}
 \end{frame}
 
@@ -1006,14 +886,14 @@
     \setlength{\itemsep}{.15cm}
     \item[$\bullet$] \bemph{Ellenberg et al.} (\texttt{arXiv:2503.11061}) --
       FunSearch \bemph{for working mathematicians}: any commercial LLM API,
-      no HPC, one Python file (\emph{priority} + \emph{evaluator}).
+      one Python file (\emph{priority} + \emph{evaluator}).
     \item[$\bullet$] \bemph{OpenEvolve} -- community open-source clone
       (\texttt{github.com/algorithmicsuperintelligence/openevolve}).
     \pause
     \item[$\bullet$] \bemph{ShinkaEvolve} (\texttt{arXiv:2509.19349}, ICLR 2026) --
       Sakana AI; sample-efficient. New 26-circle packing SOTA with only
       150 LLM samples.
-    \pause
+    % \pause
     % \item[$\bullet$] \bemph{FlowBoost} (\texttt{arXiv:2601.18005}, 2026) --
     %   LLM-free alternative (flow matching). Beats AlphaEvolve on some
     %   packing problems.
@@ -1031,12 +911,12 @@
 
 \begin{frame}
   \frametitle{Two starter problems}
-  \begin{prob}[Recover a known Ramsey bound]
-    Re-discover a 2-coloring of \( K_{17} \) with no monochromatic
-    \( K_4 \) (so that \( R(4,4) \ge 18 \)).
+  \begin{prob}[Circle packing in a square]
+    Place \( n \) circles inside the unit square, with no overlaps,
+    maximizing the sum of their radii.
     \\ \pause
-    \emph{Evaluator:} count monochromatic \( K_4 \)'s in a candidate
-    coloring; reward \( = -\#\text{monochromatic } K_4 \).
+    \emph{Evaluator:} check boundary + overlap constraints; reward \(=\)
+    total radius if valid, otherwise penalize or reject.
   \end{prob}
   \pause
   \vspace{.3cm}
@@ -1062,12 +942,16 @@
       \pause
       \vspace{.2cm}
     \item[\textbf{2.}] A \remph{deterministic} evaluator returns a
-      real-valued score in seconds (or less).
+      real-valued score in seconds.
       \pause
       \vspace{.2cm}
-    \item[\textbf{3.}] Meaningful gap from trivial baseline to SOTA --
-      somewhere to climb.
+    \item[\textbf{3.}] Meaningful gap from trivial baseline to SOTA.
   \end{itemize}
+  % \pause
+  % \vspace{.3cm}
+
+  % Then guard against \emph{overfitting} (score across many instances) and
+  % \remph{reward hacking} (a sloppy evaluator).
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1092,18 +976,22 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Three takeaways}
+  \frametitle{Four takeaways}
   \pause
   \begin{enumerate}[label=\textbf{\arabic*.}]
-    \item AI can now \remph{discover} new mathematics --
-      not just compute or verify.
+    \item \remph{Discovery} by evolving code -- constructions and
+      heuristics, not proofs.
       \pause
-      \vspace{.3cm}
+      \vspace{.25cm}
     \item Trust comes from the \remph{evaluator}, not the LLM.
       \pause
-      \vspace{.3cm}
-    \item The model is \remph{collaboration} -- AI generates patterns;
-      humans recognize structure and prove theorems.
+      \vspace{.25cm}
+    \item \remph{Sweet spot}: combinatorial / constructive problems with a
+      \emph{fast, deterministic evaluator}.
+      \pause
+      \vspace{.25cm}
+    \item The model is \remph{collaboration} -- AI suggests the pattern;
+      humans recognize the structure and prove the theorem.
   \end{enumerate}
 \end{frame}
 
@@ -1112,6 +1000,9 @@
 \begin{frame}
   \begin{center}
     \Huge Thank you!
+
+    % \vspace{1cm}
+    % {\large \emph{Now, the hands-on: design an evaluator, run the loop.}}
   \end{center}
 \end{frame}
 

@@ -13,6 +13,14 @@ Notes:
 
 Good afternoon. My name is Byung-Hak Hwang.
 
+Let me start with a small disclaimer.
+This is a mixed audience.
+Some of you know much more about coding agents than I do.
+But I think many of you are new to this area.
+So I will start from very simple examples.
+For the experts, some parts may feel basic.
+But I hope this will give us a common starting point.
+
 Today I will talk about evolutionary coding agents.
 
 The goal is not to give a technical survey of AI.
@@ -162,7 +170,7 @@ It was one of the first clear examples where an LLM-based search system made a n
 [Click]
 
 AlphaEvolve came later.
-It used Gemini models.
+It used large language models.
 It worked at a larger scale.
 It could evolve not only one small function, but larger pieces of code.
 It was applied both to mathematics and to engineering problems inside Google.
@@ -351,7 +359,7 @@ Only evaluator-certified programs survive.
 So the mathematical guarantee does not come from the LLM.
 It comes from the evaluator.
 
-This is the key difference from simply asking ChatGPT for a solution.
+This is the key difference from simply asking an LLM for a solution.
 The LLM proposes executable programs.
 The evaluator decides which programs survive.
 
@@ -393,48 +401,37 @@ It is a large search process.
 The LLM is used many times.
 The evaluator is used many times.
 
-## Four Components, One Iteration
+## One Iteration Of The Loop
 
 Let us spell out one iteration.
 
 [Click]
 
-First, we have a program database.
-It stores all programs seen so far.
-It ranks them by performance.
-It also tries to keep diversity.
+First, the system picks a few parent programs.
+They should be strong.
+They should also be diverse.
+This keeps the search from becoming too narrow.
 
 [Click]
 
-Second, a prompt sampler chooses programs from the database.
-It does not always choose only the best ones.
-It also chooses varied ones, so that the search does not collapse too early.
+Second, an LLM writes a child program.
+The child is meant to improve on the parents.
 
 [Click]
 
-Third, an LLM ensemble writes a child program.
-In AlphaEvolve, fast models can explore broadly.
-Stronger models can make deeper changes.
+Third, the evaluator runs the child.
+It scores the output.
+If the child is good, or if it adds useful diversity, the system keeps it.
 
 [Click]
 
-Fourth, an evaluator pool runs the child program.
-It scores the result.
-If the result is interesting, it is stored.
+The prompt can be very simple:
+Here are programs and scores.
+Write a better one.
 
 [Click]
 
-The prompt can be thought of like this:
-Here are several programs solving the same problem.
-Here are their scores.
-Write a new program with a higher score.
-
-[Click]
-
-This is repeated around one hundred thousand times.
-In some settings, even more.
-
-That scale matters.
+Then the loop repeats many times.
 Small improvements can accumulate.
 
 ## What Is Actually Being Evolved?
@@ -498,35 +495,43 @@ This is a good first example because the mechanism is very clean.
 The LLM did not prove an optimal bound.
 It found code that constructs a better object.
 
-## Example 1: The Priority Function
+## Example 1: Where The Evolved Code Enters
 
-Here is the seed program.
+Now let me show where the evolved code enters.
 
-It is almost empty.
-It takes a vector and the dimension.
-It returns zero.
+The main constructor is human-written.
+It is a greedy algorithm.
 
-So initially, every vector has the same priority.
+It starts with the empty set A.
+It lists all vectors in the space. 
+Then it sorts the vectors by a priority score.
+
+After that, it tries the vectors one by one.
+If adding the next vector does not create a three-term progression,
+the algorithm keeps it.
+Otherwise, it skips it.
+
+At the end, it returns the set A.
 
 [Click]
 
-From this trivial seed, FunSearch evolves a heuristic.
-The heuristic is then used inside a greedy algorithm.
-The greedy algorithm adds vectors one by one, as long as no three-term progression is created.
+Here is the key point.
+The greedy loop is not evolved.
+The cap-set checker is not evolved.
+Only this small priority function is evolved.
+
+The seed version is trivial.
+It returns zero for every vector.
+So at the beginning, every vector has the same priority.
 
 [Click]
 
-This point is important.
-Only the priority function evolves.
-The greedy loop is human-written.
-The cap-set checker is human-written.
-
-The evaluator builds the set greedily.
-It checks the cap-set condition.
-Then it returns the size.
+The evaluator is also simple.
+It runs the greedy constructor with the proposed priority function.
+Then it returns the size of the final set.
 
 So the LLM is not trusted.
-The LLM only proposes a new priority function.
+The LLM only proposes a new priority rule.
 The evaluator decides whether it is useful.
 
 ## Example 1: What FunSearch Evolved
@@ -578,56 +583,14 @@ And R(5,5) is also known only within a range.
 
 These are classical combinatorial search problems.
 
-## Example 2: What Evolves?
+## Example 2: One System, Many Better Bounds
 
-Now let us ask the same question as before.
-What is actually being evolved?
+For many entries in the Ramsey table, progress needs a special search.
+Often, each entry is its own project.
 
-In this Ramsey experiment, the system does not evolve one graph directly.
-It evolves a graph-search program.
-
-Each run of the program returns two graphs.
-
-The first graph is called G one.
-This is the valid candidate.
-It should have no forbidden clique and no forbidden independent set.
-
-The second graph is called G two.
-This is a larger near-miss.
-The paper calls it a prospect.
-It may not be valid yet, but it is close.
-
-[Click]
-
-Then the evaluator does three things.
-
-First, it rejects G one if G one contains a forbidden K_r,
-or an independent set of size s.
-
-Second, it scores the size of G one.
-If the size passes the previous known bound, it gets a boost.
-
-Third, it also looks at G two.
-If G two has only a few violations, that gives a near-miss bonus.
-
-This is useful because the search can learn from almost-successful attempts.
-
-[Click]
-
-So the surprise is not just one graph.
-The surprise is one loop producing many cell-specific searchers.
-
-Here, "cell-specific" means that the program for one Ramsey entry may be
-different from the program for another entry.
-The system is learning search methods for particular parts of the table.
-
-## Example 2: AlphaEvolve Takes A Single Shot
-
-For many entries in the Ramsey table, progress has required very special human-designed searches.
-Each entry can be its own project.
-
-Nagda, Raghavan, and Thakurta used AlphaEvolve as a single meta-algorithm.
-The goal was to raise lower bounds across the table.
+Nagda, Raghavan, and Thakurta used AlphaEvolve in several Ramsey cases.
+The goal was simple:
+build larger graphs that avoid the forbidden structures.
 
 [Click]
 
@@ -643,11 +606,11 @@ It means the known lower bound improved.
 [Click]
 
 The striking point is not only one improved graph.
-The striking point is that one system improved nine classical lower bounds.
+The striking point is that one system improved nine lower bounds.
 
-This is the payoff of the previous slide.
-The system did not use one hand-written search for each row.
-It used one evolutionary loop to produce many useful search programs.
+Here the evolved objects are graph-search programs.
+The evaluator is a graph checker.
+It checks whether the output avoids the forbidden clique or independent set.
 
 Again, the evaluator is the source of trust.
 The LLM proposes code.

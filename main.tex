@@ -190,7 +190,7 @@
       \midrule
       Transformers, GNNs, RL
         & \remph{FunSearch}, \newline \remph{AlphaEvolve}
-        & AlphaProof, \newline Gemini Deep Think, \newline Aristotle \\
+        & Formal and informal \newline proof systems \\
       \midrule
       Detects hidden patterns; suggests conjectures
         & Searches for \emph{algorithms} that build mathematical objects
@@ -233,10 +233,10 @@
   \vspace{.4cm}
 
   \begin{itemize}
-    \item[$\bullet$] \bemph{FunSearch} (\emph{Nature} 2023) -- first
+    \item[$\bullet$] \bemph{FunSearch} -- first
       LLM-driven evolutionary discovery in mathematics.
       \pause
-    \item[$\bullet$] \remph{AlphaEvolve} (DeepMind 2025) -- Gemini,
+    \item[$\bullet$] \remph{AlphaEvolve} -- large-scale LLMs,
       codebase-level evolution, open math problems + Google infrastructure.
       \pause
     \item[$\bullet$] 2025--2026 -- Tao, Gómez-Serrano, Williamson, \ldots:
@@ -300,7 +300,7 @@
   \pause
   \vspace{.25cm}
 
-  In each case, a candidate can be scored automatically -- by set size,
+  In each case, a candidate can be scored -- by set size,
   tour length, or sum of radii \(\Rightarrow\) GA can search for the optimum.
   \pause
   \vspace{.25cm}
@@ -319,8 +319,7 @@
 
 \begin{frame}
   \frametitle{LLMs as a smart mutation operator}
-  Modern \bemph{LLMs} (GPT, Claude, Gemini, \ldots) -- read code,
-  understand intent, propose changes.
+  Modern \bemph{LLMs} can read code, understand intent, and propose changes.
   \pause
   \vspace{.3cm}
 
@@ -448,33 +447,29 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Four components, one iteration}
+  \frametitle{One iteration of the loop}
   \pause
   \begin{itemize}
-    \setlength{\itemsep}{.1cm}
-    \item[\textbf{1.}] \bemph{Program database} -- all programs so far,
-      ranked by performance + diversity.
+    \setlength{\itemsep}{.18cm}
+    \item[$\bullet$] Pick a few strong and diverse \bemph{parent programs}.
       \pause
-    \item[\textbf{2.}] \bemph{Prompt sampler} -- picks good + varied programs,
-      assembles the prompt.
+    \item[$\bullet$] Ask an \bemph{LLM} to write a better \bemph{child program}.
       \pause
-    \item[\textbf{3.}] \bemph{LLM ensemble} -- Gemini Flash (fast / broad)
-      + Gemini Pro (slow / deep) write a child program.
-      \pause
-    \item[\textbf{4.}] \bemph{Evaluator pool} -- runs, scores, returns to
-      database if interesting.
+    \item[$\bullet$] Run the \bemph{evaluator}; keep the child if it scores
+      well or adds diversity.
   \end{itemize}
+  \pause
+  \vspace{.35cm}
+
+  \begin{center}
+    Prompt template: \\
+    \emph{``Here are programs and scores. Write a better one.''}
+  \end{center}
   \pause
   \vspace{.25cm}
 
-  Prompt template:
-  \emph{``Here are \(k\) programs solving \(P\) with scores
-    \(s_1, \ldots, s_k\); write a higher-scoring one.''}
-  \pause
-  \vspace{.2cm}
-
   \begin{center}
-    Repeat \(\sim 10^5 \) times.
+    Repeat many times.
   \end{center}
 \end{frame}
 
@@ -542,17 +537,26 @@
 
 
 \begin{frame}[fragile]
-  \frametitle{Example 1: the priority function}
-  \begin{block}{The seed program}
-  % \scriptsize
-  % \begin{verbatim}
-  % def priority(v: tuple[int, ...], n: int) -> float:
-  %   """Returns the priority of vector v.
-  %   The cap set is built by adding vectors that
-  %   do not create a 3-term AP, in order of priority.
-  %   """
-  %   return 0.0
-  % \end{verbatim}
+  \frametitle{Example 1: where the evolved code enters}
+  \begin{block}{Human-written greedy constructor}
+  \scriptsize
+  \begin{verbatim}
+  def build_cap_set(n, priority):
+    A = []
+    vectors = all_vectors_in_F3n(n)
+    for v in sorted(vectors,
+                    key=lambda x: priority(x, n),
+                    reverse=True):
+      if no_3_term_AP(A + [v]):
+        A.append(v)
+    return A
+  \end{verbatim}
+  \normalsize
+  \end{block}
+  \pause
+
+  \begin{block}{The only evolved piece}
+  \scriptsize
   \begin{verbatim}
   def priority(v: tuple[int, ...], n: int) -> float:
     return 0.0
@@ -560,19 +564,10 @@
   \normalsize
   \end{block}
   \pause
-  \vspace{.2cm}
+  \vspace{.05cm}
 
-  From this trivial seed, FunSearch evolves a heuristic that --
-  run greedily -- produces a record cap set.
-  \pause
-  \vspace{.25cm}
-
-  \emph{Only the \texttt{priority} function evolves} -- the greedy loop
-  and the cap-set checker stay \bemph{human-written}.
-  \vspace{.12cm}
-
-  \emph{Evaluator:} build the set greedily, reject any 3-term AP,
-  return its size.
+  \emph{Evaluator:} compute \texttt{A = build\_cap\_set(n, priority)}
+  and return \texttt{len(A)}.
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -604,9 +599,9 @@
   \pause
   \vspace{.1cm}
 
-  Real, readable Python -- \emph{no human wrote it}. The
-  \remph{\(i \leftrightarrow -i\)} symmetry (\texttt{v[i]} vs \texttt{v[-i]})
-  is the clue that let humans \emph{understand} the size-512 set.
+  Real, readable Python -- \emph{no human wrote it}.
+  % The \remph{\(i \leftrightarrow -i\)} symmetry (\texttt{v[i]} vs \texttt{v[-i]})
+  % is the clue that let humans \emph{understand} the size-512 set.
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -642,45 +637,11 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 \begin{frame}
-  \frametitle{Example 2: what evolves?}
-  \bemph{What evolves:} a \remph{graph-search program} \( p \), not a
-  graph directly. Each run returns \emph{two} graphs:
-  \begin{itemize}
-    \setlength{\itemsep}{.05cm}
-    \item[$\bullet$] \( G_1 \) -- a \emph{valid} candidate;
-    \item[$\bullet$] \( G_2 \) -- a larger \remph{near-miss} (the paper's
-      ``prospect'').
-  \end{itemize}
-  \pause
-  \vspace{.25cm}
-
-  \bemph{Evaluator:}
-  \begin{itemize}
-    \setlength{\itemsep}{.05cm}
-    \item[$\bullet$] reject \( G_1 \) if it contains a forbidden \( K_r \)
-      or an independent \( s \)-set;
-    \item[$\bullet$] score \( |G_1| \), \emph{boosted} past the previous bound;
-    \item[$\bullet$] add a \remph{near-miss bonus} from \( G_2 \)'s few
-      violations.
-  \end{itemize}
-  \pause
-  \vspace{.25cm}
-
-  \begin{center}
-    \emph{The surprise is not one graph -- it is one loop producing many
-    \remph{cell-specific} searchers.}
-  \end{center}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{frame}
-  \frametitle{Example 2: AlphaEvolve takes a single shot}
-  Each classical entry: \emph{decades} of bespoke human search.
-  \emph{Nagda et al.}\ (\texttt{arXiv:2603.09172}): AlphaEvolve as a
-  \remph{single meta-algorithm}, raising \emph{lower bounds} across the table.
+  \frametitle{Example 2: one system, many better bounds}
+  Each entry in the Ramsey table usually needs a separate search.
+  \emph{Nagda et al.}\ (\texttt{arXiv:2603.09172}) used AlphaEvolve to
+  build larger Ramsey graphs in several cases.
   \pause
   \vspace{.2cm}
 
@@ -703,7 +664,8 @@
   \pause
   \vspace{.2cm}
 
-  \emph{One} system improved \emph{nine} classical lower bounds.
+  \emph{Result:} one system improved \emph{nine} classical lower bounds. \\
+  \emph{What evolves:} graph-search programs; \emph{evaluator:} graph checker.
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -747,9 +709,9 @@
     \item[$\bullet$] \bemph{Evaluator:} run on the \( 4 \times 4 \) matmul
       tensor; return the rank -- and \remph{verify it exactly} (round the
       coefficients, check the identity).
-      \pause
-    \item[$\bullet$] \bemph{Trick discovered:} \emph{complex} coefficients
-      with magic cancellations.
+    %   \pause
+    % \item[$\bullet$] \bemph{Trick discovered:} \emph{complex} coefficients
+    %   with magic cancellations.
   \end{itemize}
   \pause
   \vspace{.3cm}
@@ -767,7 +729,7 @@
 
 %   \begin{itemize}
 %     \item[$\bullet$] Evolved matmul kernel: \remph{\( 23\% \) faster} on
-%       Gemini training hardware. $\sim 1\%$ of total training time saved.
+%       training hardware. $\sim 1\%$ of total training time saved.
 %       \pause
 %     \item[$\bullet$] Evolved scheduler: recovers \remph{\( 0.7\% \)} of
 %       Google's worldwide compute.
@@ -824,10 +786,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{What AlphaEvolve cannot (yet) do}
+  \frametitle{What Evolutionary coding agent cannot (yet) do}
   \pause
   \begin{itemize}
-    \item[$\bullet$] \bemph{No proofs.} AlphaEvolve \emph{itself} outputs
+    \item[$\bullet$] \bemph{No proofs.} Coding agent \emph{itself} outputs
       constructions and heuristics.
       % -- separate systems (Deep Think, AlphaProof) must prove them.
       \pause
@@ -875,7 +837,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{frame}
+\begin{frame} 
   \frametitle{The Evolve ecosystem}
   AlphaEvolve runs \emph{only} inside DeepMind --
   but the paradigm has gone open.

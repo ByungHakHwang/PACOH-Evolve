@@ -48,6 +48,7 @@ def test_execute_program_supports_all_problem_interfaces(tmp_path):
         DashboardParams(problem_type="circle_packing", packing_n=10),
         DashboardParams(problem_type="tsp", tsp_n=12, tsp_seed=5),
         DashboardParams(problem_type="no_isosceles", noiso_n=6),
+        DashboardParams(problem_type="facility_location", facility_n=30, facility_k=4, facility_seed=7),
     ]
     for params in cases:
         problem_root = tmp_path / params.problem_type
@@ -63,6 +64,9 @@ def test_execute_program_supports_all_problem_interfaces(tmp_path):
         elif params.problem_type == "tsp":
             assert len(data["cities"]) == params.tsp_n
             assert len(data["tour"]) == params.tsp_n
-        else:
+        elif params.problem_type == "no_isosceles":
             assert data["grid_n"] == params.noiso_n
             assert len(data["selected_points"]) > 0
+        else:
+            assert len(data["demand_points"]) == params.facility_n
+            assert len(data["facilities"]) == params.facility_k

@@ -30,6 +30,16 @@ METRIC_KEYS = (
     "isosceles_count",
     "invalid_point_count",
     "out_of_range_count",
+    "mean_distance",
+    "max_distance",
+    "p90_distance",
+    "coverage_fraction",
+    "coverage_count",
+    "coverage_radius",
+    "reported_score",
+    "duplicate_facility_penalty",
+    "facility_count_error",
+    "point_mismatch",
 )
 
 
@@ -110,6 +120,8 @@ def score_column(problem_type: str, history: list[dict[str, Any]]) -> str | None
         return "tour_length"
     if problem_type == "no_isosceles" and "subset_size" in keys:
         return "subset_size"
+    if problem_type == "facility_location" and "mean_distance" in keys:
+        return "mean_distance"
     return None
 
 
@@ -145,6 +157,42 @@ print(json.dumps({{
     'grid_n': int(grid_n),
     'selected_points': np.asarray(selected_points, dtype=int).tolist(),
     'reported_size': float(reported_size),
+}}))
+"""
+    elif problem_type == "facility_location":
+        script = f"""
+import importlib.util, json, os, numpy as np
+CLUSTER_CENTERS = np.asarray([
+    [0.18, 0.22],
+    [0.28, 0.78],
+    [0.52, 0.50],
+    [0.74, 0.24],
+    [0.82, 0.78],
+    [0.50, 0.86],
+], dtype=float)
+CLUSTER_WEIGHTS = np.asarray([0.18, 0.16, 0.24, 0.14, 0.18, 0.10], dtype=float)
+CLUSTER_STD = 0.065
+def generate_demand_points(n, seed):
+    rng = np.random.default_rng(seed)
+    assignments = rng.choice(len(CLUSTER_CENTERS), size=n, p=CLUSTER_WEIGHTS / CLUSTER_WEIGHTS.sum())
+    points = CLUSTER_CENTERS[assignments] + rng.normal(0.0, CLUSTER_STD, size=(n, 2))
+    return np.clip(points, 0.02, 0.98)
+spec = importlib.util.spec_from_file_location('program', {str(program_path)!r})
+program = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(program)
+if hasattr(program, 'run_facility_location'):
+    returned_points, facilities, reported_score = program.run_facility_location()
+else:
+    returned_points, facilities, reported_score = program.run_packing()
+n = int(os.environ.get('FACILITY_N', '50'))
+seed = int(os.environ.get('FACILITY_SEED', '0'))
+demand_points = generate_demand_points(n, seed)
+print(json.dumps({{
+    'demand_points': np.asarray(demand_points, dtype=float).tolist(),
+    'returned_demand_points': np.asarray(returned_points, dtype=float).tolist(),
+    'facilities': np.asarray(facilities, dtype=float).tolist(),
+    'reported_score': float(reported_score),
+    'coverage_radius': float(os.environ.get('FACILITY_COVERAGE_RADIUS', '0.16')),
 }}))
 """
     else:

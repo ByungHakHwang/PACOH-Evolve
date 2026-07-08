@@ -7,15 +7,17 @@ checkpoint visualizations.
 
 ## Scope
 
-The dashboard supports the same three examples as the Colab notebook:
+The dashboard supports the same four examples as the Colab notebook:
 
 - `circle_packing`
 - `tsp`
 - `no_isosceles`
+- `facility_location`
 
-Users can change bounded parameters such as problem size, score mode,
-temperature, token budget, iteration count, and visualization timeout. The
-dashboard does not accept arbitrary Python evaluator code from users.
+Users can change bounded parameters such as problem size, facility count, random
+seed, score mode, temperature, token budget, iteration count, and visualization
+timeout. The dashboard does not accept arbitrary Python evaluator code from
+users.
 
 ## Server Architecture
 

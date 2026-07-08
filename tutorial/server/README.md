@@ -11,12 +11,13 @@ configuration, log tail, best source code를 보여준다.
 
 ## 지원 예제
 
-Colab notebook과 같은 세 예제를 지원한다.
+Colab notebook과 같은 네 예제를 지원한다.
 
 ```text
 circle_packing
 tsp
 no_isosceles
+facility_location
 ```
 
 공통으로 바꿀 수 있는 값:
@@ -44,6 +45,12 @@ tsp:
 no_isosceles:
   NOISO_N
   NOISO_SCORE_MODE
+
+facility_location:
+  FACILITY_N
+  FACILITY_K
+  FACILITY_SEED
+  FACILITY_SCORE_MODE
 ```
 
 사용자 입력은 dropdown, slider, bounded numeric input으로 제한한다. 참가자에게
@@ -301,6 +308,12 @@ tsp:
 no_isosceles:
   NOISO_N=6
   NOISO_SCORE_MODE=size_minus_penalty
+
+facility_location:
+  FACILITY_N=30
+  FACILITY_K=4
+  FACILITY_SEED=0
+  FACILITY_SCORE_MODE=mean_plus_max_distance
 ```
 
 성공 기준:
@@ -339,7 +352,7 @@ participant default:
 3. 먼저 circle_packing, iterations=2로 제출하게 한다.
 4. queue 상태와 running/completed 변화를 설명한다.
 5. checkpoint가 생긴 참가자는 score plot, 그림, best source code를 보게 한다.
-6. 여유가 있는 참가자만 TSP 또는 no_isosceles로 두 번째 job을 시도한다.
+6. 여유가 있는 참가자만 TSP, no_isosceles, facility_location으로 두 번째 job을 시도한다.
 ```
 
 긴 run은 queue에 남겨도 되지만, 40분 hands-on 중에 모두 끝나는 것을 목표로 하지
@@ -363,7 +376,8 @@ participant default:
 `Problem` 선택은 submit form 밖에 있으므로 선택 즉시 problem-specific parameter와 score
 function 목록이 바뀐다. 예를 들어 `tsp`를 고르면 `TSP_N`, `TSP_SEED`,
 `TSP_SCORE_MODE`만 보이고, `no_isosceles`를 고르면 `NOISO_N`,
-`NOISO_SCORE_MODE`만 보인다.
+`NOISO_SCORE_MODE`만 보인다. `facility_location`을 고르면 `FACILITY_N`,
+`FACILITY_K`, `FACILITY_SEED`, `FACILITY_SCORE_MODE`만 보인다.
 
 `Auto refresh`는 기본적으로 꺼져 있다. 외부 공유 링크나 프록시를 통해 접속하는
 환경에서는 browser-level refresh가 Streamlit form 입력을 제출 전에 초기화할 수

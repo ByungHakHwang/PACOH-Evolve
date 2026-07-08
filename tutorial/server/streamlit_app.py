@@ -21,6 +21,9 @@ from tutorial_server.job_manager import DashboardSettings, JobManager, JobStatus
 from tutorial_server.problems import (
     CIRCLE_N_OPTIONS,
     CIRCLE_SCORE_MODES,
+    FACILITY_K_OPTIONS,
+    FACILITY_N_OPTIONS,
+    FACILITY_SCORE_MODES,
     ITERATION_OPTIONS,
     MAX_TOKEN_OPTIONS,
     NOISO_N_OPTIONS,
@@ -124,18 +127,66 @@ def plot_noiso(data: dict, title: str):
     return fig
 
 
+def plot_facility_location(data: dict, title: str):
+    demand_points = np.asarray(data["demand_points"], dtype=float)
+    facilities = np.asarray(data["facilities"], dtype=float)
+    fig, ax = plt.subplots(figsize=(5.2, 5.2))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_aspect("equal", adjustable="box")
+    ax.add_patch(plt.Rectangle((0, 0), 1, 1, fill=False, linewidth=1.8))
+    if facilities.ndim != 2 or facilities.shape[1] != 2 or len(facilities) == 0:
+        ax.scatter(demand_points[:, 0], demand_points[:, 1], s=20, color="#666666", alpha=0.8)
+    else:
+        safe_facilities = np.clip(facilities, 0.0, 1.0)
+        distances = np.linalg.norm(demand_points[:, None, :] - safe_facilities[None, :, :], axis=2)
+        labels = np.argmin(distances, axis=1)
+        cmap = plt.get_cmap("tab10")
+        colors = [cmap(int(label) % 10) for label in labels]
+        for point, label in zip(demand_points, labels):
+            facility = safe_facilities[int(label)]
+            ax.plot(
+                [point[0], facility[0]],
+                [point[1], facility[1]],
+                color=cmap(int(label) % 10),
+                alpha=0.16,
+                linewidth=0.7,
+            )
+        ax.scatter(demand_points[:, 0], demand_points[:, 1], s=24, c=colors, alpha=0.86, edgecolors="none", label="demand")
+        coverage_radius = float(data.get("coverage_radius", 0.16))
+        for idx, (x, y) in enumerate(safe_facilities):
+            ax.add_patch(
+                plt.Circle(
+                    (x, y),
+                    coverage_radius,
+                    fill=False,
+                    linestyle=":",
+                    linewidth=1.0,
+                    alpha=0.35,
+                    color=cmap(idx % 10),
+                )
+            )
+            ax.scatter([x], [y], marker="*", s=220, color=cmap(idx % 10), edgecolors="black", linewidths=0.8)
+            ax.text(x, y + 0.03, str(idx), fontsize=8, ha="center", va="bottom")
+    ax.grid(True, alpha=0.22)
+    ax.set_title(title)
+    return fig
+
+
 def plot_solution(problem_type: str, data: dict, title: str):
     if problem_type == "tsp":
         return plot_tsp(data, title)
     if problem_type == "no_isosceles":
         return plot_noiso(data, title)
+    if problem_type == "facility_location":
+        return plot_facility_location(data, title)
     return plot_circle(data, title)
 
 
 def render_submit_form(manager: JobManager):
     st.subheader("Submit Job")
     participant = st.text_input("Participant name or id", value="guest", key="participant_id")
-    problem_type = st.selectbox("Problem", ["circle_packing", "tsp", "no_isosceles"], key="problem_type")
+    problem_type = st.selectbox("Problem", ["circle_packing", "tsp", "no_isosceles", "facility_location"], key="problem_type")
     st.caption("Changing the problem updates the score and parameter options below.")
 
     with st.form("submit-job", clear_on_submit=False):
@@ -156,12 +207,16 @@ def render_submit_form(manager: JobManager):
         tsp_score_mode = "negative_length"
         noiso_n = 8
         noiso_score_mode = "size_minus_penalty"
+        facility_n = 50
+        facility_k = 5
+        facility_seed = 0
+        facility_score_mode = "mean_plus_max_distance"
 
         st.caption("Problem-specific options")
         if problem_type == "circle_packing":
             left, right = st.columns(2)
             with left:
-                custom_n = st.checkbox("Custom circle count")
+                custom_n = st.checkbox("Enter PACKING_N manually")
                 if custom_n:
                     packing_n = st.number_input("PACKING_N", min_value=4, max_value=40, value=16, step=1)
                 else:
@@ -171,7 +226,7 @@ def render_submit_form(manager: JobManager):
         elif problem_type == "tsp":
             left, mid, right = st.columns(3)
             with left:
-                custom_n = st.checkbox("Custom TSP city count")
+                custom_n = st.checkbox("Enter TSP_N manually")
                 if custom_n:
                     tsp_n = st.number_input("TSP_N", min_value=5, max_value=80, value=20, step=1)
                 else:
@@ -180,16 +235,38 @@ def render_submit_form(manager: JobManager):
                 tsp_seed = st.number_input("TSP_SEED", min_value=0, max_value=100000, value=0, step=1)
             with right:
                 tsp_score_mode = st.selectbox("Score mode", TSP_SCORE_MODES, index=TSP_SCORE_MODES.index("negative_length"))
-        else:
+        elif problem_type == "no_isosceles":
             left, right = st.columns(2)
             with left:
-                custom_n = st.checkbox("Custom grid size")
+                custom_n = st.checkbox("Enter NOISO_N manually")
                 if custom_n:
                     noiso_n = st.number_input("NOISO_N", min_value=4, max_value=14, value=8, step=1)
                 else:
                     noiso_n = st.selectbox("NOISO_N", NOISO_N_OPTIONS, index=NOISO_N_OPTIONS.index(8))
             with right:
                 noiso_score_mode = st.selectbox("Score mode", NOISO_SCORE_MODES, index=NOISO_SCORE_MODES.index("size_minus_penalty"))
+        else:
+            left, mid_left, mid_right, right = st.columns(4)
+            with left:
+                custom_n = st.checkbox("Enter FACILITY_N manually")
+                if custom_n:
+                    facility_n = st.number_input("FACILITY_N", min_value=10, max_value=300, value=50, step=5)
+                else:
+                    facility_n = st.selectbox("FACILITY_N", FACILITY_N_OPTIONS, index=FACILITY_N_OPTIONS.index(50))
+            with mid_left:
+                custom_k = st.checkbox("Enter FACILITY_K manually")
+                if custom_k:
+                    facility_k = st.number_input("FACILITY_K", min_value=1, max_value=20, value=5, step=1)
+                else:
+                    facility_k = st.selectbox("FACILITY_K", FACILITY_K_OPTIONS, index=FACILITY_K_OPTIONS.index(5))
+            with mid_right:
+                facility_seed = st.number_input("FACILITY_SEED", min_value=0, max_value=100000, value=0, step=1)
+            with right:
+                facility_score_mode = st.selectbox(
+                    "Score mode",
+                    FACILITY_SCORE_MODES,
+                    index=FACILITY_SCORE_MODES.index("mean_plus_max_distance"),
+                )
 
         submitted = st.form_submit_button("Start OpenEvolve")
 
@@ -207,6 +284,10 @@ def render_submit_form(manager: JobManager):
             tsp_score_mode=tsp_score_mode,
             noiso_n=int(noiso_n),
             noiso_score_mode=noiso_score_mode,
+            facility_n=int(facility_n),
+            facility_k=int(facility_k),
+            facility_seed=int(facility_seed),
+            facility_score_mode=facility_score_mode,
             visualization_timeout=int(visualization_timeout),
         )
         try:
@@ -285,7 +366,7 @@ def render_job_detail(manager: JobManager, job):
         render_visualization(manager, job)
     with right:
         st.markdown("**Recent subprocess output**")
-        st.code("\n".join(job.recent_output[-30:]) or "(no stdout captured yet)", language="text")
+        st.code("\n".join(job.recent_output[-8:]) or "(no stdout captured yet)", language="text")
         tail = log_tail(output_dir(job), limit=4000)
         with st.expander("OpenEvolve log tail", expanded=False):
             st.code(tail or "(no log file yet)", language="text")

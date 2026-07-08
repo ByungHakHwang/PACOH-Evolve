@@ -2,6 +2,7 @@ import importlib.util
 import os
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from tutorial_server.problems import DashboardParams, create_problem_files, problem_environment
@@ -27,26 +28,38 @@ def apply_env(monkeypatch, updates):
 
 
 @pytest.mark.parametrize(
-    "params,validity_key,bad_metric",
+    "params_factory,validity_key,bad_metric",
     [
         (
-            DashboardParams(problem_type="circle_packing", packing_n=10, score_mode="actual_sum_minus_penalty"),
+            lambda: DashboardParams(problem_type="circle_packing", packing_n=10, score_mode="actual_sum_minus_penalty"),
             "validity",
             "overlap_penalty",
         ),
         (
-            DashboardParams(problem_type="tsp", tsp_n=12, tsp_seed=3, tsp_score_mode="negative_length"),
+            lambda: DashboardParams(problem_type="tsp", tsp_n=12, tsp_seed=3, tsp_score_mode="negative_length"),
             "validity",
             "duplicate_count",
         ),
         (
-            DashboardParams(problem_type="no_isosceles", noiso_n=6, noiso_score_mode="size_minus_penalty"),
+            lambda: DashboardParams(problem_type="no_isosceles", noiso_n=6, noiso_score_mode="size_minus_penalty"),
             "validity",
             "isosceles_count",
         ),
+        (
+            lambda: DashboardParams(
+                problem_type="facility_location",
+                facility_n=30,
+                facility_k=4,
+                facility_seed=2,
+                facility_score_mode="mean_plus_max_distance",
+            ),
+            "validity",
+            "boundary_penalty",
+        ),
     ],
 )
-def test_problem_files_evaluate_seed_and_hacked_programs(tmp_path, monkeypatch, params, validity_key, bad_metric):
+def test_problem_files_evaluate_seed_and_hacked_programs(tmp_path, monkeypatch, params_factory, validity_key, bad_metric):
+    params = params_factory()
     files = create_problem_files(
         tmp_path,
         params,
@@ -113,6 +126,44 @@ def test_circle_packing_seed_rewards_visible_center_spread(tmp_path, monkeypatch
     assert seed_metrics["max_center_spread"] >= seed_metrics["center_spread"]
 
 
+def test_facility_location_seed_has_clear_refinement_path(tmp_path, monkeypatch):
+    params = DashboardParams(
+        problem_type="facility_location",
+        facility_n=50,
+        facility_k=5,
+        facility_seed=4,
+        facility_score_mode="mean_plus_max_distance",
+    )
+    files = create_problem_files(tmp_path, params, model_alias="gpt-oss:20b", api_base="http://localhost:11434/v1")
+    source = files.initial_program.read_text()
+
+    assert "run_facility_location" in source
+    assert "LLOYD_STEPS = 0" in source
+    assert "lloyd_refine" in source
+
+    apply_env(monkeypatch, problem_environment(params))
+    program = load_program(files.initial_program)
+    demand_points, facilities, reported_score = program.run_facility_location()
+    refined = program.lloyd_refine(demand_points, facilities, steps=8)
+
+    seed_distances = program.assignment_distances(demand_points, facilities)
+    refined_distances = program.assignment_distances(demand_points, refined)
+    facility_motion = np.linalg.norm(refined - facilities, axis=1)
+
+    assert demand_points.shape == (params.facility_n, 2)
+    assert facilities.shape == (params.facility_k, 2)
+    assert float(facility_motion.max()) > 0.05
+    assert float(refined_distances.mean()) < float(seed_distances.mean()) * 0.85
+    assert float(reported_score) == pytest.approx(-float(seed_distances.mean()))
+
+    evaluator = load_evaluator(files.evaluator)
+    seed_metrics = evaluator.evaluate(str(files.initial_program))
+    assert seed_metrics["validity"] == 1.0
+    assert seed_metrics["mean_distance"] > 0.0
+    assert seed_metrics["max_distance"] >= seed_metrics["mean_distance"]
+    assert 0.0 <= seed_metrics["coverage_fraction"] <= 1.0
+
+
 def test_problem_environment_contains_only_selected_problem_keys():
     params = DashboardParams(problem_type="tsp", tsp_n=30, tsp_seed=11, tsp_score_mode="soft_penalty")
 
@@ -120,4 +171,21 @@ def test_problem_environment_contains_only_selected_problem_keys():
         "TSP_N": "30",
         "TSP_SEED": "11",
         "TSP_SCORE_MODE": "soft_penalty",
+    }
+
+
+def test_facility_location_environment_contains_only_facility_keys():
+    params = DashboardParams(
+        problem_type="facility_location",
+        facility_n=80,
+        facility_k=6,
+        facility_seed=13,
+        facility_score_mode="soft_coverage",
+    )
+
+    assert problem_environment(params) == {
+        "FACILITY_N": "80",
+        "FACILITY_K": "6",
+        "FACILITY_SEED": "13",
+        "FACILITY_SCORE_MODE": "soft_coverage",
     }

@@ -14,6 +14,13 @@ def load_evaluator(path: Path):
     return module
 
 
+def load_program(path: Path):
+    spec = importlib.util.spec_from_file_location("tutorial_program", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def apply_env(monkeypatch, updates):
     for key, value in updates.items():
         monkeypatch.setenv(key, value)
@@ -72,6 +79,38 @@ def test_circle_packing_config_uses_raw_score_language(tmp_path):
     assert "2.635" not in config
     assert "Optimize both centers and radii" in config
     assert 'primary_model: "gpt-oss:20b"' in config
+    assert "diff_based_evolution: true" in config
+    assert "allow_full_rewrites: false" in config
+
+
+def test_circle_packing_seed_rewards_visible_center_spread(tmp_path, monkeypatch):
+    params = DashboardParams(problem_type="circle_packing", packing_n=10, score_mode="actual_sum_minus_penalty")
+    files = create_problem_files(tmp_path, params, model_alias="gpt-oss:20b", api_base="http://localhost:11434/v1")
+    source = files.initial_program.read_text()
+    prelude, evolve_block = source.split("# EVOLVE-BLOCK-START", 1)
+
+    assert "WEAK_RADIUS_SCALE" not in source
+    assert "import os" in prelude
+    assert "import numpy as np" in prelude
+    assert "os.environ" not in evolve_block
+    assert "CENTER_SPREAD" in evolve_block
+
+    apply_env(monkeypatch, problem_environment(params))
+    program = load_program(files.initial_program)
+    centers, radii, seed_sum = program.run_packing()
+    wider_centers = program.initial_centers(params.packing_n, spread=0.70)
+    wider_radii = program.compute_max_radii(wider_centers)
+
+    center_motion = ((wider_centers - centers) ** 2).sum(axis=1) ** 0.5
+
+    assert float(center_motion.max()) > 0.05
+    assert float(wider_radii.sum()) > float(seed_sum) * 1.15
+    assert float(seed_sum) == pytest.approx(float(radii.sum()))
+
+    evaluator = load_evaluator(files.evaluator)
+    seed_metrics = evaluator.evaluate(str(files.initial_program))
+    assert seed_metrics["center_spread"] > 0.0
+    assert seed_metrics["max_center_spread"] >= seed_metrics["center_spread"]
 
 
 def test_problem_environment_contains_only_selected_problem_keys():

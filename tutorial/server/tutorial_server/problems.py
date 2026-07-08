@@ -80,29 +80,38 @@ class ProblemFiles:
 
 
 CIRCLE_INITIAL_PROGRAM = r'''
-# EVOLVE-BLOCK-START
 import math
 import os
 import numpy as np
 
 
-WEAK_RADIUS_SCALE = 0.45
+def packing_size():
+    return int(os.environ.get("PACKING_N", "16"))
 
 
-def initial_centers(n):
+# EVOLVE-BLOCK-START
+CENTER_SPREAD = 0.62
+EDGE_MARGIN = 0.02
+
+
+def initial_centers(n, spread=CENTER_SPREAD):
+    """Compressed grid seed; increasing spread visibly moves centers outward."""
     cols = int(math.ceil(math.sqrt(n)))
     rows = int(math.ceil(n / cols))
-    dx = 1.0 / cols
-    dy = 1.0 / rows
     centers = []
     for k in range(n):
         row = k // cols
         col = k % cols
-        x = (col + 0.5) * dx
-        y = (row + 0.5) * dy
-        if row % 2 == 1:
-            x += 0.1 * dx
-        centers.append((min(max(x, 0.02), 0.98), min(max(y, 0.02), 0.98)))
+        x_grid = 0.5 if cols == 1 else col / max(1, cols - 1)
+        y_grid = 0.5 if rows == 1 else row / max(1, rows - 1)
+        if row % 2 == 1 and cols > 1:
+            x_grid += 0.18 / max(1, cols - 1)
+        x = 0.5 + spread * (x_grid - 0.5)
+        y = 0.5 + spread * (y_grid - 0.5)
+        centers.append((
+            min(max(x, EDGE_MARGIN), 1.0 - EDGE_MARGIN),
+            min(max(y, EDGE_MARGIN), 1.0 - EDGE_MARGIN),
+        ))
     return np.asarray(centers, dtype=float)
 
 
@@ -112,7 +121,7 @@ def compute_max_radii(centers):
     radii = np.empty(n, dtype=float)
     for i, (x, y) in enumerate(centers):
         radii[i] = max(0.0, min(x, y, 1.0 - x, 1.0 - y))
-    for _ in range(4):
+    for _ in range(6):
         changed = False
         for i in range(n):
             for j in range(i + 1, n):
@@ -130,9 +139,9 @@ def compute_max_radii(centers):
 
 
 def construct_packing():
-    n = int(os.environ.get("PACKING_N", "16"))
+    n = packing_size()
     centers = initial_centers(n)
-    radii = WEAK_RADIUS_SCALE * compute_max_radii(centers)
+    radii = compute_max_radii(centers)
     return centers, radii, float(np.sum(radii))
 # EVOLVE-BLOCK-END
 
@@ -278,6 +287,8 @@ def _zero_metrics(eval_time, error=None):
         "validity": 0.0,
         "overlap_penalty": 0.0,
         "boundary_penalty": 0.0,
+        "center_spread": 0.0,
+        "max_center_spread": 0.0,
         "eval_time": float(eval_time),
     }
     if error is not None:
@@ -305,6 +316,9 @@ def evaluate(program_path):
     valid = validate_packing(centers, radii)
     actual_sum = float(np.sum(radii))
     overlap_penalty, boundary_penalty = compute_penalties(centers, radii)
+    center_distances = np.linalg.norm(centers - 0.5, axis=1)
+    center_spread = float(np.mean(center_distances))
+    max_center_spread = float(np.max(center_distances))
     if score_mode == "hard_valid_sum":
         combined_score = actual_sum if valid else 0.0
     elif score_mode == "actual_sum_minus_penalty":
@@ -325,6 +339,8 @@ def evaluate(program_path):
         "validity": 1.0 if valid else 0.0,
         "overlap_penalty": float(overlap_penalty),
         "boundary_penalty": float(boundary_penalty),
+        "center_spread": center_spread,
+        "max_center_spread": max_center_spread,
         "honest_overlap_weight": float(honest_overlap_weight),
         "honest_boundary_weight": float(honest_boundary_weight),
         "eval_time": float(time.time() - start_time),
@@ -335,7 +351,7 @@ def evaluate(program_path):
     print(
         f"Evaluation: mode={score_mode}, valid={valid}, actual_sum={actual_sum:.6f}, "
         f"reported_sum={float(reported_sum):.6f}, combined_score={combined_score:.6f}, "
-        f"overlap={overlap_penalty:.4f}, boundary={boundary_penalty:.4f}"
+        f"overlap={overlap_penalty:.4f}, boundary={boundary_penalty:.4f}, center_spread={center_spread:.4f}"
     )
     return metrics
 '''
@@ -825,8 +841,8 @@ evaluator:
   parallel_evaluations: 1
   use_llm_feedback: false
 
-diff_based_evolution: false
-allow_full_rewrites: true
+diff_based_evolution: true
+allow_full_rewrites: false
 '''
 
 
@@ -846,8 +862,9 @@ def _system_message(params: DashboardParams) -> str:
             f"    Improve run_packing() for packing {params.packing_n} circles in a unit square.",
             "    Preserve the interface exactly: return centers, radii, sum_radii.",
             "    Optimize both centers and radii; changing centers without recomputing radii usually will not improve the score.",
+            "    Do not remove the imports or packing_size() helper above the EVOLVE-BLOCK.",
             "    A good strategy is to choose centers, compute the largest valid radii from those centers, and return the honest sum.",
-            "    The starter program is intentionally conservative and scales valid radii down.",
+            "    The starter program intentionally compresses centers toward the middle; improving CENTER_SPREAD or initial_centers should visibly move circles.",
             "    Valid geometry matters more than claiming a large value.",
         ]
     elif params.problem_type == "tsp":

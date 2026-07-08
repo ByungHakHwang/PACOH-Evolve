@@ -20,6 +20,8 @@ METRIC_KEYS = (
     "validity",
     "overlap_penalty",
     "boundary_penalty",
+    "center_spread",
+    "max_center_spread",
     "missing_count",
     "duplicate_count",
     "city_mismatch",

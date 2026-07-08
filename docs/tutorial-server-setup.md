@@ -239,8 +239,8 @@ evaluator:
   parallel_evaluations: 1
   use_llm_feedback: false
 
-diff_based_evolution: false
-allow_full_rewrites: true
+diff_based_evolution: true
+allow_full_rewrites: false
 ```
 
 중요한 운영 값:

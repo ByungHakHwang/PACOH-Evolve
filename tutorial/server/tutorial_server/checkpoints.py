@@ -223,7 +223,10 @@ print(json.dumps({{
         raise RuntimeError(f"best_program.py did not finish within {timeout}s") from exc
     if result.returncode != 0:
         raise RuntimeError(result.stderr[-2000:] or result.stdout[-2000:])
-    return json.loads(result.stdout)
+    stdout_lines = [line for line in result.stdout.strip().splitlines() if line.strip()]
+    if not stdout_lines:
+        raise RuntimeError("best_program.py produced no visualization JSON")
+    return json.loads(stdout_lines[-1])
 
 
 def log_tail(run_dir: Path | str, limit: int = 4000) -> str:

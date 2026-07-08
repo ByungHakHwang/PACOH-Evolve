@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import threading
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -8,6 +8,11 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:  # pragma: no cover - exercised only on partially upgraded servers.
+    st_autorefresh = None
 
 from tutorial_server.checkpoints import (
     best_source,
@@ -17,7 +22,7 @@ from tutorial_server.checkpoints import (
     log_tail,
     score_column,
 )
-from tutorial_server.job_manager import DashboardSettings, JobManager, JobStatus, summarize_jobs
+from tutorial_server.job_manager import DashboardSettings, JobManager, JobStatus, safe_slug, summarize_jobs
 from tutorial_server.problems import (
     CIRCLE_N_OPTIONS,
     CIRCLE_SCORE_MODES,
@@ -37,6 +42,7 @@ from tutorial_server.problems import (
 
 
 st.set_page_config(page_title="OpenEvolve Tutorial", layout="wide")
+PLOT_LOCK = threading.Lock()
 
 
 @st.cache_resource
@@ -44,13 +50,16 @@ def get_manager() -> JobManager:
     return JobManager()
 
 
-def health_check(settings: DashboardSettings) -> tuple[bool, str]:
-    url = settings.api_base.rstrip("/") + "/models"
+@st.cache_data(ttl=10)
+def health_check(api_base: str, expected_model: str) -> tuple[bool, str]:
+    url = api_base.rstrip("/") + "/models"
     try:
         response = requests.get(url, timeout=2)
         if response.ok:
             models = response.json().get("data", [])
             names = [model.get("id", "?") for model in models]
+            if expected_model and names and expected_model not in names:
+                return False, f"reachable, but {expected_model!r} not in {names}"
             return True, ", ".join(names) or "reachable"
         return False, response.text[-500:]
     except Exception as exc:
@@ -62,14 +71,7 @@ def output_dir(job) -> Path:
 
 
 def visualization_env(settings: DashboardSettings, params: DashboardParams) -> dict[str, str]:
-    env = problem_environment(params)
-    if settings.pydeps_path is not None:
-        existing = os.environ.get("PYTHONPATH", "")
-        parts = [str(settings.pydeps_path)]
-        if existing:
-            parts.append(existing)
-        env["PYTHONPATH"] = os.pathsep.join(parts)
-    return env
+    return problem_environment(params)
 
 
 def plot_circle(data: dict, title: str):
@@ -183,9 +185,19 @@ def plot_solution(problem_type: str, data: dict, title: str):
     return plot_circle(data, title)
 
 
+@st.cache_data(show_spinner=False)
+def cached_execute_program(program_path: str, checkpoint_number: int, mtime_ns: int, env_items: tuple[tuple[str, str], ...], problem_type: str, timeout: int):
+    return execute_program(
+        Path(program_path),
+        env=dict(env_items),
+        problem_type=problem_type,
+        timeout=timeout,
+    )
+
+
 def render_submit_form(manager: JobManager):
     st.subheader("Submit Job")
-    participant = st.text_input("Participant name or id", value="guest", key="participant_id")
+    participant = st.text_input("Participant name or id", value="", key="participant_id")
     problem_type = st.selectbox("Problem", ["circle_packing", "tsp", "no_isosceles", "facility_location"], key="problem_type")
     st.caption("Changing the problem updates the score and parameter options below.")
 
@@ -251,6 +263,9 @@ def render_submit_form(manager: JobManager):
         submitted = st.form_submit_button("Start OpenEvolve")
 
     if submitted:
+        if not participant.strip():
+            st.error("Please enter a participant id before submitting a job.")
+            return
         params = DashboardParams(
             problem_type=problem_type,
             iterations=int(iterations),
@@ -274,10 +289,10 @@ def render_submit_form(manager: JobManager):
             job = manager.submit(participant, params)
             st.success(f"Queued job {job.id}")
         except Exception as exc:
-            st.error(str(exc))
+            st.error(f"{exc}. Please use a unique participant id.")
 
 
-def render_job_list(manager: JobManager):
+def render_job_list(manager: JobManager, participant: str):
     jobs = manager.jobs()
     st.subheader("Jobs")
     if not jobs:
@@ -285,9 +300,19 @@ def render_job_list(manager: JobManager):
         return None
     rows = summarize_jobs(jobs)
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    labels = [f"{job.id} | {job.participant} | {job.params.problem_type} | {job.status.value}" for job in jobs]
-    selected_label = st.selectbox("Inspect job", labels)
-    selected_id = selected_label.split(" | ", 1)[0]
+    job_by_id = {job.id: job for job in jobs}
+    options = [job.id for job in jobs]
+    selected_key = "selected_job_id"
+    if st.session_state.get(selected_key) not in job_by_id:
+        participant_slug = safe_slug(participant)
+        own_latest = next((job.id for job in jobs if job.participant == participant_slug), None)
+        st.session_state[selected_key] = own_latest or options[0]
+
+    def label(job_id: str) -> str:
+        job = job_by_id[job_id]
+        return f"{job.id} | {job.participant} | {job.params.problem_type} | {job.status.value}"
+
+    selected_id = st.selectbox("Inspect job", options, key=selected_key, format_func=label)
     return manager.get_job(selected_id)
 
 
@@ -309,21 +334,28 @@ def render_visualization(manager: JobManager, job):
     if checkpoint is None:
         return
     env = visualization_env(manager.settings, job.params)
+    timeout = min(int(job.params.visualization_timeout), 20)
+    fig = None
     try:
-        data = execute_program(
-            checkpoint.program_path,
-            env=env,
+        data = cached_execute_program(
+            str(checkpoint.program_path),
+            checkpoint.number,
+            checkpoint.program_path.stat().st_mtime_ns,
+            tuple(sorted(env.items())),
             problem_type=job.params.problem_type,
-            timeout=job.params.visualization_timeout,
+            timeout=timeout,
         )
-        fig = plot_solution(job.params.problem_type, data, f"Best {job.params.problem_type} at checkpoint {checkpoint.number}")
-        st.pyplot(fig)
-        plt.close(fig)
+        with PLOT_LOCK:
+            fig = plot_solution(job.params.problem_type, data, f"Best {job.params.problem_type} at checkpoint {checkpoint.number}")
+            st.pyplot(fig)
     except Exception as exc:
         st.warning(f"Could not render best_program.py: {exc}")
+    finally:
+        if fig is not None:
+            plt.close(fig)
 
 
-def render_job_detail(manager: JobManager, job):
+def render_job_detail(manager: JobManager, job, participant: str):
     st.subheader("Selected Job")
     status_cols = st.columns(5)
     status_cols[0].metric("Status", job.status.value)
@@ -332,10 +364,14 @@ def render_job_detail(manager: JobManager, job):
     status_cols[3].metric("Elapsed seconds", f"{job.elapsed_seconds:.1f}")
     status_cols[4].metric("Problem", job.params.problem_type)
 
-    if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+    can_cancel = job.participant == safe_slug(participant)
+    if job.status in {JobStatus.QUEUED, JobStatus.RUNNING} and can_cancel:
         if st.button("Cancel selected job"):
-            manager.cancel(job.id)
+            if not manager.cancel(job.id):
+                st.warning("Could not cancel this job. It may have already finished.")
             st.rerun()
+    elif job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+        st.caption("Only the participant who submitted this job can cancel it.")
 
     st.caption(f"Run directory: {job.run_dir}")
     st.caption(f"OpenEvolve output: {output_dir(job)}")
@@ -368,9 +404,12 @@ def main():
     if st.sidebar.checkbox("Auto refresh", value=False, key="auto_refresh"):
         seconds = st.sidebar.slider("Refresh seconds", min_value=3, max_value=30, value=5)
         st.sidebar.caption("Keep this off while filling the submit form.")
-        st.sidebar.markdown(f"<meta http-equiv='refresh' content='{seconds}'>", unsafe_allow_html=True)
+        if st_autorefresh is None:
+            st.sidebar.warning("Install streamlit-autorefresh to enable automatic refresh.")
+        else:
+            st_autorefresh(interval=seconds * 1000, key="auto_refresh_tick")
 
-    ok, payload = health_check(settings)
+    ok, payload = health_check(settings.api_base, settings.model)
     st.sidebar.subheader("Server")
     st.sidebar.write("Ollama:", "OK" if ok else "Unavailable")
     st.sidebar.caption(payload)
@@ -388,10 +427,10 @@ def main():
     with form_col:
         render_submit_form(manager)
     with jobs_col:
-        selected_job = render_job_list(manager)
+        selected_job = render_job_list(manager, st.session_state.get("participant_id", ""))
 
     if selected_job is not None:
-        render_job_detail(manager, selected_job)
+        render_job_detail(manager, selected_job, st.session_state.get("participant_id", ""))
 
 
 if __name__ == "__main__":

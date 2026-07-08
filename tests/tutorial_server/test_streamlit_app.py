@@ -5,6 +5,16 @@ def test_auto_refresh_is_opt_in_by_default():
     source = Path("tutorial/server/streamlit_app.py").read_text()
 
     assert 'st.sidebar.checkbox("Auto refresh", value=False' in source
+    assert "meta http-equiv" not in source
+    assert "st_autorefresh" in source
+
+
+def test_participant_id_is_not_shared_guest_default():
+    source = Path("tutorial/server/streamlit_app.py").read_text()
+
+    assert 'st.text_input("Participant name or id", value=""' in source
+    assert 'value="guest"' not in source
+    assert "Please enter a participant id" in source
 
 
 def test_problem_choice_controls_submit_form_contents():

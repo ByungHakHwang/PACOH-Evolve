@@ -337,7 +337,10 @@ facility_location:
 OPENEVOLVE_MAX_ACTIVE_JOBS=3
 OPENEVOLVE_PER_USER_QUEUED_JOBS=1
 
-participant default:
+participant:
+  참가자가 직접 입력해야 함
+
+job defaults:
   iterations=2 or 3
   temperature=0.4
   max_tokens=1536
@@ -379,10 +382,10 @@ function 목록이 바뀐다. 예를 들어 `tsp`를 고르면 `TSP_N`, `TSP_SEE
 `NOISO_SCORE_MODE`만 보인다. `facility_location`을 고르면 `FACILITY_N`,
 `FACILITY_K`, `FACILITY_SEED`, `FACILITY_SCORE_MODE`만 보인다.
 
-`Auto refresh`는 기본적으로 꺼져 있다. 외부 공유 링크나 프록시를 통해 접속하는
-환경에서는 browser-level refresh가 Streamlit form 입력을 제출 전에 초기화할 수
-있으므로, job을 제출하기 전에는 켜지 않는다. job 제출 후 진행 상황만 볼 때 켜거나,
-대신 `Refresh now` 버튼을 누른다.
+`Auto refresh`는 기본적으로 꺼져 있다. 켜면 Streamlit autorefresh component가
+주기적으로 rerun을 요청한다. 브라우저 전체 페이지를 reload하지 않도록 구현되어
+있지만, job을 제출하기 전에는 혼동을 줄이기 위해 꺼 둔다. 제출 후 진행 상황만
+볼 때 켜거나, 대신 `Refresh now` 버튼을 누른다.
 
 Job status 의미:
 
@@ -444,17 +447,16 @@ export OPENEVOLVE_MAX_ACTIVE_JOBS=1
 
 ### 입력 중 화면이 깜빡이거나 form 값이 초기화됨
 
-`Auto refresh`가 켜져 있으면 browser가 주기적으로 페이지를 reload한다. 외부 링크나
-reverse proxy 환경에서는 이 reload가 새 세션처럼 처리되어 form 값이 초기화될 수
-있다.
+현재 dashboard는 browser-level meta refresh를 쓰지 않고 Streamlit autorefresh
+component를 사용한다. 그래도 외부 링크나 reverse proxy 환경에서 입력 중 rerun이
+거슬리면 다음처럼 운영한다.
 
 대응:
 
 ```text
 1. Auto refresh를 끈다.
-2. 화면이 한 번 더 reload될 수 있으므로 몇 초 기다린다.
-3. 참가자 정보와 parameter를 입력한 뒤 Start OpenEvolve를 누른다.
-4. 제출 후에는 Refresh now 버튼을 사용하거나 Auto refresh를 다시 켠다.
+2. 참가자 정보와 parameter를 입력한 뒤 Start OpenEvolve를 누른다.
+3. 제출 후에는 Refresh now 버튼을 사용하거나 Auto refresh를 다시 켠다.
 ```
 
 ### evaluator import error
@@ -499,7 +501,8 @@ curl -I http://127.0.0.1:8501
 export OPENEVOLVE_PER_USER_QUEUED_JOBS=1
 ```
 
-참가자에게 participant id를 다르게 바꾸지 말라고 안내한다.
+각 참가자는 서로 다른 participant id를 사용해야 한다. 비어 있는 participant id는
+제출할 수 없고, 같은 id는 queued/running job을 동시에 하나만 가질 수 있다.
 
 ## 11. Run directory 구조
 

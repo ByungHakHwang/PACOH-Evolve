@@ -119,7 +119,7 @@ class JobManager:
                 if safe_slug(job.participant) == participant_slug and job.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.CANCELLING}
             ]
             if len(active_for_user) >= self.settings.per_user_queued_jobs:
-                raise ValueError(f"{participant_slug} already has a queued or running job")
+                raise ValueError(f"{participant_slug} already has a queued or running job; use a different participant id or wait for it to finish")
 
             job_id = uuid.uuid4().hex[:10]
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -159,6 +159,7 @@ class JobManager:
             return {status.value: sum(1 for job in self._jobs.values() if job.status == status) for status in JobStatus}
 
     def cancel(self, job_id: str) -> bool:
+        process: subprocess.Popen | None = None
         with self._condition:
             job = self._jobs.get(job_id)
             if not job:
@@ -170,12 +171,16 @@ class JobManager:
                 self._write_metadata_unlocked(job)
                 self._condition.notify_all()
                 return True
-            if job.status == JobStatus.RUNNING and job.process is not None:
+            if job.status == JobStatus.RUNNING:
                 job.status = JobStatus.CANCELLING
-                self._terminate_process(job.process)
+                process = job.process
                 self._write_metadata_unlocked(job)
-                return True
-            return False
+                self._condition.notify_all()
+            else:
+                return False
+        if process is not None:
+            self._signal_process(process, signal.SIGTERM)
+        return True
 
     def build_command(self, job: Job) -> tuple[list[str], dict[str, str]]:
         cmd = [
@@ -215,7 +220,16 @@ class JobManager:
                 job = self._jobs.get(job_id)
             if job is None:
                 continue
-            self._run_job(job)
+            try:
+                self._run_job(job)
+            except Exception as exc:
+                with self._condition:
+                    job.status = JobStatus.FAILED
+                    job.error = f"Worker error: {exc}"
+                    job.ended_at = time.time()
+                    job.process = None
+                    self._write_metadata_unlocked(job)
+                    self._condition.notify_all()
 
     def _run_job(self, job: Job):
         with self._condition:
@@ -233,6 +247,7 @@ class JobManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                errors="replace",
                 bufsize=1,
                 env=env,
                 start_new_session=True,
@@ -249,15 +264,36 @@ class JobManager:
         with self._condition:
             job.process = process
             self._write_metadata_unlocked(job)
+            cancel_requested = job.status == JobStatus.CANCELLING
 
-        assert process.stdout is not None
-        for line in iter(process.stdout.readline, ""):
+        if cancel_requested:
+            self._signal_process(process, signal.SIGTERM)
+
+        returncode: int | None = None
+        try:
+            assert process.stdout is not None
+            for line in iter(process.stdout.readline, ""):
+                with self._condition:
+                    job.recent_output.append(line.rstrip())
+                    job.recent_output = job.recent_output[-80:]
+                    self._write_metadata_unlocked(job)
+            process.stdout.close()
+            returncode = process.wait()
+        except Exception as exc:
+            self._signal_process(process, signal.SIGKILL)
+            try:
+                process.wait(timeout=2)
+            except Exception:
+                pass
             with self._condition:
-                job.recent_output.append(line.rstrip())
-                job.recent_output = job.recent_output[-80:]
+                job.returncode = process.returncode
+                job.ended_at = time.time()
+                job.process = None
+                job.status = JobStatus.FAILED
+                job.error = f"Worker failed while reading subprocess output: {exc}"
                 self._write_metadata_unlocked(job)
-        process.stdout.close()
-        returncode = process.wait()
+                self._condition.notify_all()
+            return
 
         with self._condition:
             job.returncode = returncode
@@ -274,39 +310,39 @@ class JobManager:
             self._condition.notify_all()
 
     def _write_metadata_unlocked(self, job: Job):
-        job.run_dir.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "id": job.id,
-            "participant": job.participant,
-            "status": job.status.value,
-            "created_at": job.created_at,
-            "started_at": job.started_at,
-            "ended_at": job.ended_at,
-            "returncode": job.returncode,
-            "error": job.error,
-            "run_dir": str(job.run_dir),
-            "openevolve_output_dir": str(job.run_dir / "openevolve_output"),
-            "problem_dir": str(job.problem_files.directory),
-            "params": asdict(job.params),
-            "recent_output": job.recent_output[-80:],
-        }
-        job.metadata_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        try:
+            job.run_dir.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "id": job.id,
+                "participant": job.participant,
+                "status": job.status.value,
+                "created_at": job.created_at,
+                "started_at": job.started_at,
+                "ended_at": job.ended_at,
+                "returncode": job.returncode,
+                "error": job.error,
+                "run_dir": str(job.run_dir),
+                "openevolve_output_dir": str(job.run_dir / "openevolve_output"),
+                "problem_dir": str(job.problem_files.directory),
+                "params": asdict(job.params),
+                "recent_output": job.recent_output[-80:],
+                "pid": job.process.pid if job.process is not None else None,
+            }
+            temp_path = job.metadata_path.with_suffix(".json.tmp")
+            temp_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+            os.replace(temp_path, job.metadata_path)
+        except OSError as exc:
+            if not job.error:
+                job.error = f"Could not write job metadata: {exc}"
 
     @staticmethod
-    def _terminate_process(process: subprocess.Popen):
+    def _signal_process(process: subprocess.Popen, sig: signal.Signals):
         if process.poll() is not None:
             return
         try:
-            os.killpg(process.pid, signal.SIGTERM)
-            process.wait(timeout=10)
+            os.killpg(process.pid, sig)
         except ProcessLookupError:
             return
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait(timeout=10)
 
 
 def summarize_jobs(jobs: Iterable[Job]) -> list[dict[str, object]]:

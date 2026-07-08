@@ -33,7 +33,7 @@ FACILITY_SCORE_MODES = (
     "intentionally_bad_reported_score",
 )
 
-ITERATION_OPTIONS = (1, 2, 3, 5, 10, 20, 50)
+ITERATION_OPTIONS = (1, 2, 3, 5, 10, 20)
 MAX_TOKEN_OPTIONS = (1024, 1536, 2048, 4096)
 PROMPT_STYLES = ("balanced", "conservative", "creative")
 
@@ -208,6 +208,8 @@ import numpy as np
 
 
 REFERENCE_VALUE_N26 = 2.635
+SCORE_FLOOR = -1e9
+REPORTED_LIMIT = 1e6
 
 
 def _config():
@@ -221,9 +223,37 @@ def _config():
     )
 
 
+def safe_float(value, default=0.0):
+    try:
+        result = float(value)
+    except Exception:
+        return float(default)
+    return result if np.isfinite(result) else float(default)
+
+
+def clamp_reported(value, default=0.0):
+    return float(np.clip(safe_float(value, default), -REPORTED_LIMIT, REPORTED_LIMIT))
+
+
+def finite_score(value):
+    try:
+        result = float(value)
+    except Exception:
+        return SCORE_FLOOR
+    return result if np.isfinite(result) else SCORE_FLOOR
+
+
+def sanitize_metrics(metrics):
+    for key, value in list(metrics.items()):
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            numeric = float(value)
+            metrics[key] = numeric if np.isfinite(numeric) else (SCORE_FLOOR if key == "combined_score" else 0.0)
+    return metrics
+
+
 def validate_packing(centers, radii):
     n = centers.shape[0]
-    if np.isnan(centers).any() or np.isnan(radii).any():
+    if not np.isfinite(centers).all() or not np.isfinite(radii).all():
         return False
     for i in range(n):
         if radii[i] < 0:
@@ -244,7 +274,7 @@ def compute_penalties(centers, radii):
     n = centers.shape[0]
     overlap_penalty = 0.0
     boundary_penalty = 0.0
-    if np.isnan(centers).any() or np.isnan(radii).any():
+    if not np.isfinite(centers).all() or not np.isfinite(radii).all():
         return 1e6, 1e6
     for i in range(n):
         x, y = centers[i]
@@ -306,7 +336,7 @@ except Exception as e:
 
 def _zero_metrics(eval_time, error=None):
     metrics = {
-        "combined_score": 0.0,
+        "combined_score": SCORE_FLOOR,
         "sum_radii": 0.0,
         "reported_sum": 0.0,
         "validity": 0.0,
@@ -326,36 +356,41 @@ def evaluate(program_path):
     start_time = time.time()
     try:
         centers, radii, reported_sum = run_with_timeout(program_path, timeout_seconds=30)
+        reported_sum = clamp_reported(reported_sum)
+        centers = np.asarray(centers, dtype=float)
+        radii = np.asarray(radii, dtype=float)
+        if centers.shape != (n, 2) or radii.shape != (n,):
+            metrics = _zero_metrics(time.time() - start_time, error="invalid shapes")
+            metrics["reported_sum"] = reported_sum
+            if score_mode == "intentionally_bad_reported_sum":
+                metrics["combined_score"] = reported_sum
+            return sanitize_metrics(metrics)
+        if not np.isfinite(centers).all() or not np.isfinite(radii).all():
+            metrics = _zero_metrics(time.time() - start_time, error="non-finite packing")
+            metrics["reported_sum"] = reported_sum
+            return sanitize_metrics(metrics)
+
+        valid = validate_packing(centers, radii)
+        actual_sum = safe_float(np.sum(radii))
+        overlap_penalty, boundary_penalty = compute_penalties(centers, radii)
+        center_distances = np.linalg.norm(centers - 0.5, axis=1)
+        center_spread = safe_float(np.mean(center_distances))
+        max_center_spread = safe_float(np.max(center_distances))
+        if score_mode == "hard_valid_sum":
+            combined_score = actual_sum if valid else 0.0
+        elif score_mode == "actual_sum_minus_penalty":
+            combined_score = actual_sum - honest_overlap_weight * overlap_penalty - honest_boundary_weight * boundary_penalty
+        elif score_mode == "upstream_target_ratio_n26":
+            combined_score = (actual_sum / REFERENCE_VALUE_N26) if valid else 0.0
+        elif score_mode == "soft_penalty":
+            combined_score = reported_sum - overlap_weight * overlap_penalty - boundary_weight * boundary_penalty
+        elif score_mode == "intentionally_bad_reported_sum":
+            combined_score = reported_sum
+        else:
+            raise ValueError(f"Unknown SCORE_MODE: {score_mode!r}")
+        combined_score = finite_score(combined_score)
     except Exception as e:
         return _zero_metrics(time.time() - start_time, error=e)
-
-    centers = np.asarray(centers, dtype=float)
-    radii = np.asarray(radii, dtype=float)
-    if centers.shape != (n, 2) or radii.shape != (n,):
-        metrics = _zero_metrics(time.time() - start_time, error="invalid shapes")
-        if score_mode == "intentionally_bad_reported_sum":
-            metrics["reported_sum"] = float(reported_sum)
-            metrics["combined_score"] = float(reported_sum)
-        return metrics
-
-    valid = validate_packing(centers, radii)
-    actual_sum = float(np.sum(radii))
-    overlap_penalty, boundary_penalty = compute_penalties(centers, radii)
-    center_distances = np.linalg.norm(centers - 0.5, axis=1)
-    center_spread = float(np.mean(center_distances))
-    max_center_spread = float(np.max(center_distances))
-    if score_mode == "hard_valid_sum":
-        combined_score = actual_sum if valid else 0.0
-    elif score_mode == "actual_sum_minus_penalty":
-        combined_score = actual_sum - honest_overlap_weight * overlap_penalty - honest_boundary_weight * boundary_penalty
-    elif score_mode == "upstream_target_ratio_n26":
-        combined_score = (actual_sum / REFERENCE_VALUE_N26) if valid else 0.0
-    elif score_mode == "soft_penalty":
-        combined_score = float(reported_sum) - overlap_weight * overlap_penalty - boundary_weight * boundary_penalty
-    elif score_mode == "intentionally_bad_reported_sum":
-        combined_score = float(reported_sum)
-    else:
-        raise ValueError(f"Unknown SCORE_MODE: {score_mode!r}")
 
     metrics = {
         "combined_score": float(combined_score),
@@ -378,7 +413,7 @@ def evaluate(program_path):
         f"reported_sum={float(reported_sum):.6f}, combined_score={combined_score:.6f}, "
         f"overlap={overlap_penalty:.4f}, boundary={boundary_penalty:.4f}, center_spread={center_spread:.4f}"
     )
-    return metrics
+    return sanitize_metrics(metrics)
 '''
 
 
@@ -443,8 +478,9 @@ def run_tsp():
     n = int(os.environ.get("TSP_N", "20"))
     seed = int(os.environ.get("TSP_SEED", "0"))
     cities = generate_cities(n, seed)
-    tour = np.zeros(n, dtype=int)
-    reported_length = 0.0
+    # Valid tour with dishonest length: demonstrates why trusting reported metrics is unsafe.
+    tour = np.arange(n, dtype=int)
+    reported_length = -999.0
     return cities, tour, reported_length
 # EVOLVE-BLOCK-END
 
@@ -465,6 +501,10 @@ import time
 import numpy as np
 
 
+SCORE_FLOOR = -1e9
+REPORTED_LIMIT = 1e6
+
+
 def _config():
     return (
         int(os.environ.get("TSP_N", "20")),
@@ -472,6 +512,34 @@ def _config():
         os.environ.get("TSP_SCORE_MODE", "negative_length"),
         float(os.environ.get("TSP_INVALID_PENALTY", "1000.0")),
     )
+
+
+def safe_float(value, default=0.0):
+    try:
+        result = float(value)
+    except Exception:
+        return float(default)
+    return result if np.isfinite(result) else float(default)
+
+
+def clamp_reported(value, default=0.0):
+    return float(np.clip(safe_float(value, default), -REPORTED_LIMIT, REPORTED_LIMIT))
+
+
+def finite_score(value):
+    try:
+        result = float(value)
+    except Exception:
+        return SCORE_FLOOR
+    return result if np.isfinite(result) else SCORE_FLOOR
+
+
+def sanitize_metrics(metrics):
+    for key, value in list(metrics.items()):
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            numeric = float(value)
+            metrics[key] = numeric if np.isfinite(numeric) else (SCORE_FLOOR if key == "combined_score" else 0.0)
+    return metrics
 
 
 def generate_cities(n, seed):
@@ -554,7 +622,7 @@ def analyze_tour(returned_cities, returned_tour, n, seed):
     canonical = generate_cities(n, seed)
     returned_cities = np.asarray(returned_cities, dtype=float)
     tour = np.asarray(returned_tour, dtype=int).reshape(-1)
-    if returned_cities.shape != canonical.shape:
+    if returned_cities.shape != canonical.shape or not np.isfinite(returned_cities).all():
         city_mismatch = 1.0
     else:
         city_mismatch = float(np.max(np.abs(returned_cities - canonical)))
@@ -577,21 +645,24 @@ def evaluate(program_path):
     start_time = time.time()
     try:
         returned_cities, returned_tour, reported_length = run_with_timeout(program_path, timeout_seconds=30)
+        reported_length = clamp_reported(reported_length)
+        _, tour, actual_length, valid, missing_count, duplicate_count, out_of_range_count, city_mismatch = analyze_tour(
+            returned_cities, returned_tour, n, seed
+        )
+        actual_length = safe_float(actual_length, 1e9)
+        city_mismatch = safe_float(city_mismatch, 1.0)
+        violation_count = missing_count + duplicate_count + out_of_range_count
+        if score_mode == "negative_length":
+            combined_score = -actual_length if valid else -1e6 - invalid_penalty * violation_count
+        elif score_mode == "soft_penalty":
+            combined_score = -reported_length - invalid_penalty * violation_count - city_mismatch
+        elif score_mode == "intentionally_bad_reported_length":
+            combined_score = -reported_length
+        else:
+            raise ValueError(f"Unknown TSP_SCORE_MODE: {score_mode!r}")
+        combined_score = finite_score(combined_score)
     except Exception as e:
         return _zero_metrics(time.time() - start_time, error=e)
-
-    _, tour, actual_length, valid, missing_count, duplicate_count, out_of_range_count, city_mismatch = analyze_tour(
-        returned_cities, returned_tour, n, seed
-    )
-    violation_count = missing_count + duplicate_count + out_of_range_count
-    if score_mode == "negative_length":
-        combined_score = -actual_length if valid else -1e6 - invalid_penalty * violation_count
-    elif score_mode == "soft_penalty":
-        combined_score = -float(reported_length) - invalid_penalty * violation_count - city_mismatch
-    elif score_mode == "intentionally_bad_reported_length":
-        combined_score = -float(reported_length)
-    else:
-        raise ValueError(f"Unknown TSP_SCORE_MODE: {score_mode!r}")
 
     metrics = {
         "combined_score": float(combined_score),
@@ -608,7 +679,7 @@ def evaluate(program_path):
         f"Evaluation: mode={score_mode}, valid={valid}, length={actual_length:.6f}, "
         f"reported={float(reported_length):.6f}, score={combined_score:.6f}, violations={violation_count}"
     )
-    return metrics
+    return sanitize_metrics(metrics)
 '''
 
 
@@ -669,6 +740,10 @@ import time
 import numpy as np
 
 
+SCORE_FLOOR = -1e9
+REPORTED_LIMIT = 1e6
+
+
 def _config():
     return (
         int(os.environ.get("NOISO_N", "8")),
@@ -676,6 +751,34 @@ def _config():
         float(os.environ.get("NOISO_ISOSCELES_PENALTY", "1.5")),
         float(os.environ.get("NOISO_INVALID_PENALTY", "10.0")),
     )
+
+
+def safe_float(value, default=0.0):
+    try:
+        result = float(value)
+    except Exception:
+        return float(default)
+    return result if np.isfinite(result) else float(default)
+
+
+def clamp_reported(value, default=0.0):
+    return float(np.clip(safe_float(value, default), -REPORTED_LIMIT, REPORTED_LIMIT))
+
+
+def finite_score(value):
+    try:
+        result = float(value)
+    except Exception:
+        return SCORE_FLOOR
+    return result if np.isfinite(result) else SCORE_FLOOR
+
+
+def sanitize_metrics(metrics):
+    for key, value in list(metrics.items()):
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            numeric = float(value)
+            metrics[key] = numeric if np.isfinite(numeric) else (SCORE_FLOOR if key == "combined_score" else 0.0)
+    return metrics
 
 
 def run_with_timeout(program_path, timeout_seconds=30):
@@ -793,22 +896,24 @@ def evaluate(program_path):
     start_time = time.time()
     try:
         returned_n, points, reported_size = run_with_timeout(program_path, timeout_seconds=30)
+        reported_size = clamp_reported(reported_size)
+        grid_mismatch = 0 if int(returned_n) == n else 1
+        selected, duplicate_count, out_of_range_count, shape_error = normalize_points(points, n)
+        isosceles_count, examples = count_isosceles(selected)
+        invalid_point_count = duplicate_count + out_of_range_count + shape_error + grid_mismatch
+        subset_size = len(selected)
+        valid = isosceles_count == 0 and invalid_point_count == 0
+        if score_mode == "hard_valid_size":
+            combined_score = float(subset_size if valid else 0.0)
+        elif score_mode == "size_minus_penalty":
+            combined_score = float(subset_size - iso_penalty * isosceles_count - invalid_penalty * invalid_point_count)
+        elif score_mode == "intentionally_bad_reported_size":
+            combined_score = reported_size
+        else:
+            raise ValueError(f"Unknown NOISO_SCORE_MODE: {score_mode!r}")
+        combined_score = finite_score(combined_score)
     except Exception as e:
         return _zero_metrics(time.time() - start_time, error=e)
-    grid_mismatch = 0 if int(returned_n) == n else 1
-    selected, duplicate_count, out_of_range_count, shape_error = normalize_points(points, n)
-    isosceles_count, examples = count_isosceles(selected)
-    invalid_point_count = duplicate_count + out_of_range_count + shape_error + grid_mismatch
-    subset_size = len(selected)
-    valid = isosceles_count == 0 and invalid_point_count == 0
-    if score_mode == "hard_valid_size":
-        combined_score = float(subset_size if valid else 0.0)
-    elif score_mode == "size_minus_penalty":
-        combined_score = float(subset_size - iso_penalty * isosceles_count - invalid_penalty * invalid_point_count)
-    elif score_mode == "intentionally_bad_reported_size":
-        combined_score = float(reported_size)
-    else:
-        raise ValueError(f"Unknown NOISO_SCORE_MODE: {score_mode!r}")
     metrics = {
         "combined_score": float(combined_score),
         "subset_size": float(subset_size),
@@ -828,7 +933,7 @@ def evaluate(program_path):
         f"reported={reported_size}, isosceles={isosceles_count}, invalid_points={invalid_point_count}, "
         f"score={combined_score:.3f}"
     )
-    return metrics
+    return sanitize_metrics(metrics)
 '''
 
 
@@ -960,6 +1065,10 @@ import time
 import numpy as np
 
 
+SCORE_FLOOR = -1e9
+REPORTED_LIMIT = 1e6
+
+
 CLUSTER_CENTERS = np.asarray(
     [
         [0.18, 0.22],
@@ -986,6 +1095,34 @@ def _config():
         float(os.environ.get("FACILITY_DIVERSITY_WEIGHT", "0.03")),
         float(os.environ.get("FACILITY_INVALID_PENALTY", "100.0")),
     )
+
+
+def safe_float(value, default=0.0):
+    try:
+        result = float(value)
+    except Exception:
+        return float(default)
+    return result if np.isfinite(result) else float(default)
+
+
+def clamp_reported(value, default=0.0):
+    return float(np.clip(safe_float(value, default), -REPORTED_LIMIT, REPORTED_LIMIT))
+
+
+def finite_score(value):
+    try:
+        result = float(value)
+    except Exception:
+        return SCORE_FLOOR
+    return result if np.isfinite(result) else SCORE_FLOOR
+
+
+def sanitize_metrics(metrics):
+    for key, value in list(metrics.items()):
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            numeric = float(value)
+            metrics[key] = numeric if np.isfinite(numeric) else (SCORE_FLOOR if key == "combined_score" else 0.0)
+    return metrics
 
 
 def generate_demand_points(n, seed):
@@ -1118,43 +1255,44 @@ def evaluate(program_path):
     start_time = time.time()
     try:
         returned_points, returned_facilities, reported_score = run_with_timeout(program_path, timeout_seconds=30)
+        reported_score = clamp_reported(reported_score)
+        canonical_points = generate_demand_points(n, seed)
+        mismatch = point_mismatch(returned_points, canonical_points)
+        facilities, facility_count_error, nonfinite_count, boundary_penalty = normalize_facilities(returned_facilities, k)
+        distances = assignment_distances(canonical_points, facilities)
+        mean_distance = safe_float(np.mean(distances), 1e9)
+        max_distance = safe_float(np.max(distances), 1e9)
+        p90_distance = safe_float(np.percentile(distances, 90), 1e9)
+        coverage_count = int(np.count_nonzero(distances <= coverage_radius))
+        coverage_fraction = safe_float(coverage_count / n)
+        duplicate_penalty = duplicate_facility_penalty(facilities)
+        invalid_indicator = 1.0 if (
+            facility_count_error > 0
+            or nonfinite_count > 0
+            or boundary_penalty > 1e-9
+            or mismatch > 1e-8
+        ) else 0.0
+        valid = invalid_indicator == 0.0
+        invalid_cost = invalid_penalty * (invalid_indicator + boundary_penalty + float(facility_count_error) + float(nonfinite_count) + min(1.0, mismatch))
+
+        if score_mode == "mean_plus_max_distance":
+            combined_score = -(mean_distance + max_weight * max_distance) - diversity_weight * duplicate_penalty - invalid_cost
+        elif score_mode == "negative_mean_distance":
+            combined_score = -mean_distance - invalid_cost
+        elif score_mode == "negative_max_distance":
+            combined_score = -max_distance - invalid_cost
+        elif score_mode == "soft_coverage":
+            soft_coverage = safe_float(np.mean(np.exp(-((distances / coverage_radius) ** 2))))
+            combined_score = soft_coverage - diversity_weight * duplicate_penalty - invalid_cost
+        elif score_mode == "hard_coverage":
+            combined_score = coverage_fraction if valid else 0.0
+        elif score_mode == "intentionally_bad_reported_score":
+            combined_score = reported_score
+        else:
+            raise ValueError(f"Unknown FACILITY_SCORE_MODE: {score_mode!r}")
+        combined_score = finite_score(combined_score)
     except Exception as e:
         return _zero_metrics(time.time() - start_time, error=e)
-
-    canonical_points = generate_demand_points(n, seed)
-    mismatch = point_mismatch(returned_points, canonical_points)
-    facilities, facility_count_error, nonfinite_count, boundary_penalty = normalize_facilities(returned_facilities, k)
-    distances = assignment_distances(canonical_points, facilities)
-    mean_distance = float(np.mean(distances))
-    max_distance = float(np.max(distances))
-    p90_distance = float(np.percentile(distances, 90))
-    coverage_count = int(np.count_nonzero(distances <= coverage_radius))
-    coverage_fraction = float(coverage_count / n)
-    duplicate_penalty = duplicate_facility_penalty(facilities)
-    invalid_indicator = 1.0 if (
-        facility_count_error > 0
-        or nonfinite_count > 0
-        or boundary_penalty > 1e-9
-        or mismatch > 1e-8
-    ) else 0.0
-    valid = invalid_indicator == 0.0
-    invalid_cost = invalid_penalty * (invalid_indicator + boundary_penalty + float(facility_count_error) + float(nonfinite_count) + min(1.0, mismatch))
-
-    if score_mode == "mean_plus_max_distance":
-        combined_score = -(mean_distance + max_weight * max_distance) - diversity_weight * duplicate_penalty - invalid_cost
-    elif score_mode == "negative_mean_distance":
-        combined_score = -mean_distance - invalid_cost
-    elif score_mode == "negative_max_distance":
-        combined_score = -max_distance - invalid_cost
-    elif score_mode == "soft_coverage":
-        soft_coverage = float(np.mean(np.exp(-((distances / coverage_radius) ** 2))))
-        combined_score = soft_coverage - diversity_weight * duplicate_penalty - invalid_cost
-    elif score_mode == "hard_coverage":
-        combined_score = coverage_fraction if valid else 0.0
-    elif score_mode == "intentionally_bad_reported_score":
-        combined_score = float(reported_score)
-    else:
-        raise ValueError(f"Unknown FACILITY_SCORE_MODE: {score_mode!r}")
 
     metrics = {
         "combined_score": float(combined_score),
@@ -1178,7 +1316,7 @@ def evaluate(program_path):
         f"max={max_distance:.6f}, coverage={coverage_fraction:.3f}, score={combined_score:.6f}, "
         f"boundary={boundary_penalty:.4f}, duplicate={duplicate_penalty:.4f}"
     )
-    return metrics
+    return sanitize_metrics(metrics)
 '''
 
 

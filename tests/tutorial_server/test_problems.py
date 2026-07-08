@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tutorial_server.problems import DashboardParams, create_problem_files, problem_environment
+from tutorial_server.problems import DashboardParams, ITERATION_OPTIONS, create_problem_files, problem_environment
 
 
 def load_evaluator(path: Path):
@@ -25,6 +25,16 @@ def load_program(path: Path):
 def apply_env(monkeypatch, updates):
     for key, value in updates.items():
         monkeypatch.setenv(key, value)
+
+
+def assert_finite_metrics(metrics):
+    for key, value in metrics.items():
+        if isinstance(value, float):
+            assert np.isfinite(value), (key, value, metrics)
+
+
+def test_tutorial_iteration_options_allow_20_but_not_50():
+    assert ITERATION_OPTIONS == (1, 2, 3, 5, 10, 20)
 
 
 @pytest.mark.parametrize(
@@ -81,7 +91,11 @@ def test_problem_files_evaluate_seed_and_hacked_programs(tmp_path, monkeypatch, 
 
     assert "combined_score" in seed_metrics
     assert seed_metrics[validity_key] == 1.0
-    assert hacked_metrics[validity_key] == 0.0 or hacked_metrics[bad_metric] > 0
+    if params.problem_type == "tsp":
+        assert hacked_metrics["validity"] == 1.0
+        assert hacked_metrics["reported_length"] == -999.0
+    else:
+        assert hacked_metrics[validity_key] == 0.0 or hacked_metrics[bad_metric] > 0
 
 
 def test_circle_packing_config_uses_raw_score_language(tmp_path):
@@ -189,3 +203,132 @@ def test_facility_location_environment_contains_only_facility_keys():
         "FACILITY_SEED": "13",
         "FACILITY_SCORE_MODE": "soft_coverage",
     }
+
+
+def test_generated_evaluators_return_finite_worst_score_for_bad_outputs(tmp_path, monkeypatch):
+    cases = [
+        (
+            DashboardParams(problem_type="circle_packing", packing_n=4, score_mode="actual_sum_minus_penalty"),
+            """
+import numpy as np
+def run_packing():
+    return np.full((4, 2), 0.5), np.full(4, np.inf), 1e309
+""",
+        ),
+        (
+            DashboardParams(problem_type="tsp", tsp_n=8, tsp_seed=2, tsp_score_mode="negative_length"),
+            """
+def run_tsp():
+    return [[0.0, 0.0]], None, "bad"
+""",
+        ),
+        (
+            DashboardParams(problem_type="no_isosceles", noiso_n=6, noiso_score_mode="size_minus_penalty"),
+            """
+def run_no_isosceles():
+    return "bad", object(), "bad"
+""",
+        ),
+        (
+            DashboardParams(
+                problem_type="facility_location",
+                facility_n=30,
+                facility_k=4,
+                facility_seed=1,
+                facility_score_mode="mean_plus_max_distance",
+            ),
+            """
+def run_facility_location():
+    return [[0.0, 0.0]], [[float("inf"), 0.5]], "bad"
+""",
+        ),
+    ]
+    for index, (params, source) in enumerate(cases):
+        files = create_problem_files(
+            tmp_path / f"case_{index}",
+            params,
+            model_alias="gpt-oss:20b",
+            api_base="http://localhost:11434/v1",
+        )
+        bad_program = files.directory / "bad_program.py"
+        bad_program.write_text(source)
+        apply_env(monkeypatch, problem_environment(params))
+        evaluator = load_evaluator(files.evaluator)
+
+        metrics = evaluator.evaluate(str(bad_program))
+
+        assert metrics["combined_score"] < 0.0
+        assert metrics["validity"] == 0.0
+        assert_finite_metrics(metrics)
+
+
+def test_reported_score_hacks_are_clamped_to_finite_values(tmp_path, monkeypatch):
+    cases = [
+        (
+            DashboardParams(problem_type="circle_packing", packing_n=4, score_mode="intentionally_bad_reported_sum"),
+            """
+import numpy as np
+def run_packing():
+    centers = np.asarray([[0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]])
+    radii = np.full(4, 0.1)
+    return centers, radii, 1e308
+""",
+            "reported_sum",
+        ),
+        (
+            DashboardParams(problem_type="tsp", tsp_n=8, tsp_seed=2, tsp_score_mode="intentionally_bad_reported_length"),
+            """
+import numpy as np
+def run_tsp():
+    rng = np.random.default_rng(2)
+    return rng.random((8, 2)), np.arange(8), -1e308
+""",
+            "reported_length",
+        ),
+        (
+            DashboardParams(problem_type="no_isosceles", noiso_n=6, noiso_score_mode="intentionally_bad_reported_size"),
+            """
+import numpy as np
+def run_no_isosceles():
+    return 6, np.asarray([[0, 0], [1, 0], [2, 0]]), 1e308
+""",
+            "reported_size",
+        ),
+        (
+            DashboardParams(
+                problem_type="facility_location",
+                facility_n=30,
+                facility_k=4,
+                facility_seed=1,
+                facility_score_mode="intentionally_bad_reported_score",
+            ),
+            """
+import numpy as np
+CLUSTER_CENTERS = np.asarray([[0.18, 0.22], [0.28, 0.78], [0.52, 0.50], [0.74, 0.24], [0.82, 0.78], [0.50, 0.86]])
+CLUSTER_WEIGHTS = np.asarray([0.18, 0.16, 0.24, 0.14, 0.18, 0.10])
+def run_facility_location():
+    rng = np.random.default_rng(1)
+    assignments = rng.choice(len(CLUSTER_CENTERS), size=30, p=CLUSTER_WEIGHTS / CLUSTER_WEIGHTS.sum())
+    points = np.clip(CLUSTER_CENTERS[assignments] + rng.normal(0.0, 0.065, size=(30, 2)), 0.02, 0.98)
+    return points, np.asarray([[0.2, 0.2], [0.3, 0.8], [0.7, 0.2], [0.8, 0.8]]), 1e308
+""",
+            "reported_score",
+        ),
+    ]
+    for index, (params, source, reported_key) in enumerate(cases):
+        files = create_problem_files(
+            tmp_path / f"reported_{index}",
+            params,
+            model_alias="gpt-oss:20b",
+            api_base="http://localhost:11434/v1",
+        )
+        program = files.directory / "reported_program.py"
+        program.write_text(source)
+        apply_env(monkeypatch, problem_environment(params))
+        evaluator = load_evaluator(files.evaluator)
+
+        metrics = evaluator.evaluate(str(program))
+
+        assert abs(metrics[reported_key]) <= 1_000_000.0
+        assert abs(metrics["combined_score"]) <= 1_000_000.0
+        assert_finite_metrics(metrics)

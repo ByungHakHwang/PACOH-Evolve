@@ -67,3 +67,29 @@ def test_cancel_queued_job(tmp_path):
 
     assert manager.cancel(job.id)
     assert manager.get_job(job.id).status == JobStatus.CANCELLED
+
+
+def test_cancel_running_job_does_not_wait_while_holding_lock(tmp_path, monkeypatch):
+    manager = make_manager(tmp_path)
+    job = manager.submit("alice", DashboardParams(problem_type="circle_packing"))
+
+    class SlowProcess:
+        pid = 123456
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            raise AssertionError("cancel should not wait for process termination")
+
+    with manager._condition:
+        manager._pending.clear()
+        job.status = JobStatus.RUNNING
+        job.process = SlowProcess()
+
+    signals = []
+    monkeypatch.setattr("os.killpg", lambda pid, sig: signals.append((pid, sig)))
+
+    assert manager.cancel(job.id)
+    assert manager.get_job(job.id).status == JobStatus.CANCELLING
+    assert signals

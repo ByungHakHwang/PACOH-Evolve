@@ -70,3 +70,20 @@ def test_execute_program_supports_all_problem_interfaces(tmp_path):
         else:
             assert len(data["demand_points"]) == params.facility_n
             assert len(data["facilities"]) == params.facility_k
+
+
+def test_execute_program_ignores_program_stdout_before_json(tmp_path):
+    program = tmp_path / "noisy_program.py"
+    program.write_text(
+        """
+import numpy as np
+
+def run_packing():
+    print("debug line from evolved program")
+    return np.asarray([[0.5, 0.5]]), np.asarray([0.25]), 0.25
+"""
+    )
+
+    data = execute_program(program, problem_type="circle_packing", timeout=10)
+
+    assert data["sum_radii"] == 0.25

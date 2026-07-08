@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tutorial_server.problems import DashboardParams, ITERATION_OPTIONS, create_problem_files, problem_environment
+from tutorial_server.problems import DashboardParams, ITERATION_OPTIONS, create_problem_files, problem_environment, score_function_preview
 
 
 def load_evaluator(path: Path):
@@ -186,6 +186,50 @@ def test_problem_environment_contains_only_selected_problem_keys():
         "TSP_SEED": "11",
         "TSP_SCORE_MODE": "soft_penalty",
     }
+
+
+@pytest.mark.parametrize(
+    "params,expected_header,expected_code,forbidden_code",
+    [
+        (
+            DashboardParams(problem_type="circle_packing", packing_n=16, score_mode="actual_sum_minus_penalty"),
+            "# SCORE_MODE=actual_sum_minus_penalty",
+            "- 20.0 * overlap_penalty",
+            "reported_sum = clamp_reported",
+        ),
+        (
+            DashboardParams(problem_type="tsp", tsp_n=20, tsp_seed=5, tsp_score_mode="negative_length"),
+            "# TSP_SCORE_MODE=negative_length",
+            "-actual_length if valid else -1e6 - 1000.0 * violation_count",
+            "reported_length = clamp_reported",
+        ),
+        (
+            DashboardParams(problem_type="no_isosceles", noiso_n=8, noiso_score_mode="size_minus_penalty"),
+            "# NOISO_SCORE_MODE=size_minus_penalty",
+            "subset_size",
+            "reported_size = clamp_reported",
+        ),
+        (
+            DashboardParams(
+                problem_type="facility_location",
+                facility_n=50,
+                facility_k=5,
+                facility_seed=2,
+                facility_score_mode="soft_coverage",
+            ),
+            "# FACILITY_SCORE_MODE=soft_coverage",
+            "soft_coverage = float(np.mean",
+            "reported_score = clamp_reported",
+        ),
+    ],
+)
+def test_score_function_preview_matches_selected_mode(params, expected_header, expected_code, forbidden_code):
+    preview = score_function_preview(params)
+
+    assert preview.startswith(f"# Problem: {params.problem_type}")
+    assert expected_header in preview
+    assert expected_code in preview
+    assert forbidden_code not in preview
 
 
 def test_facility_location_environment_contains_only_facility_keys():

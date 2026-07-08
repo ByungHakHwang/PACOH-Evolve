@@ -38,6 +38,7 @@ from tutorial_server.problems import (
     TSP_SCORE_MODES,
     DashboardParams,
     problem_environment,
+    score_function_preview,
 )
 
 
@@ -389,6 +390,8 @@ def render_job_detail(manager: JobManager, job, participant: str):
         source = best_source(output_dir(job))
         with st.expander("Best source code", expanded=False):
             st.code(source or "(no stable best_program.py yet)", language="python")
+        with st.expander("Selected score function", expanded=True):
+            st.code(score_function_preview(job.params), language="python")
 
 
 def main():

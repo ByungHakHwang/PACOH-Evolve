@@ -1422,6 +1422,139 @@ def active_score_mode(params: DashboardParams) -> str:
     return params.facility_score_mode
 
 
+def _format_score_preview(problem_type: str, env: dict[str, str], score_mode: str, body: str) -> str:
+    header = [
+        f"# Problem: {problem_type}",
+        f"# Active score mode: {score_mode}",
+        *(f"# {key}={value}" for key, value in env.items()),
+    ]
+    return "\n".join(header) + "\n\n" + textwrap.dedent(body).strip()
+
+
+def score_function_preview(params: DashboardParams) -> str:
+    """Return the evaluator branch used by the selected dashboard score mode."""
+    if params.problem_type == "circle_packing":
+        snippets = {
+            "hard_valid_sum": """
+                valid = validate_packing(centers, radii)
+                actual_sum = float(np.sum(radii))
+
+                combined_score = actual_sum if valid else 0.0
+            """,
+            "actual_sum_minus_penalty": """
+                actual_sum = float(np.sum(radii))
+                overlap_penalty, boundary_penalty = compute_penalties(centers, radii)
+
+                combined_score = (
+                    actual_sum
+                    - 20.0 * overlap_penalty
+                    - 20.0 * boundary_penalty
+                )
+            """,
+            "upstream_target_ratio_n26": """
+                REFERENCE_VALUE_N26 = 2.635
+                valid = validate_packing(centers, radii)
+                actual_sum = float(np.sum(radii))
+
+                combined_score = (actual_sum / REFERENCE_VALUE_N26) if valid else 0.0
+            """,
+            "soft_penalty": """
+                reported_sum = clamp_reported(program_returned_sum)
+                overlap_penalty, boundary_penalty = compute_penalties(centers, radii)
+
+                combined_score = reported_sum - 1.0 * overlap_penalty - 1.0 * boundary_penalty
+            """,
+            "intentionally_bad_reported_sum": """
+                # Bad teaching example: trusts the value reported by generated code.
+                reported_sum = clamp_reported(program_returned_sum)
+
+                combined_score = reported_sum
+            """,
+        }
+    elif params.problem_type == "tsp":
+        snippets = {
+            "negative_length": """
+                valid = len(tour) == n and violation_count == 0
+                actual_length = tour_length(canonical_cities, tour)
+
+                combined_score = -actual_length if valid else -1e6 - 1000.0 * violation_count
+            """,
+            "soft_penalty": """
+                reported_length = clamp_reported(program_returned_length)
+                violation_count = missing_count + duplicate_count + out_of_range_count
+
+                combined_score = -reported_length - 1000.0 * violation_count - city_mismatch
+            """,
+            "intentionally_bad_reported_length": """
+                # Bad teaching example: trusts the length reported by generated code.
+                reported_length = clamp_reported(program_returned_length)
+
+                combined_score = -reported_length
+            """,
+        }
+    elif params.problem_type == "no_isosceles":
+        snippets = {
+            "hard_valid_size": """
+                valid = isosceles_count == 0 and invalid_point_count == 0
+
+                combined_score = float(subset_size if valid else 0.0)
+            """,
+            "size_minus_penalty": """
+                combined_score = float(
+                    subset_size
+                    - 1.5 * isosceles_count
+                    - 10.0 * invalid_point_count
+                )
+            """,
+            "intentionally_bad_reported_size": """
+                # Bad teaching example: trusts the size reported by generated code.
+                reported_size = clamp_reported(program_returned_size)
+
+                combined_score = reported_size
+            """,
+        }
+    else:
+        snippets = {
+            "mean_plus_max_distance": """
+                combined_score = (
+                    -(mean_distance + 0.35 * max_distance)
+                    - 0.03 * duplicate_penalty
+                    - invalid_cost
+                )
+            """,
+            "negative_mean_distance": """
+                combined_score = -mean_distance - invalid_cost
+            """,
+            "negative_max_distance": """
+                combined_score = -max_distance - invalid_cost
+            """,
+            "soft_coverage": """
+                soft_coverage = float(np.mean(np.exp(-((distances / 0.16) ** 2))))
+
+                combined_score = soft_coverage - 0.03 * duplicate_penalty - invalid_cost
+            """,
+            "hard_coverage": """
+                valid = invalid_indicator == 0.0
+
+                combined_score = coverage_fraction if valid else 0.0
+            """,
+            "intentionally_bad_reported_score": """
+                # Bad teaching example: trusts the score reported by generated code.
+                reported_score = clamp_reported(program_returned_score)
+
+                combined_score = reported_score
+            """,
+        }
+
+    score_mode = active_score_mode(params)
+    return _format_score_preview(
+        params.problem_type,
+        problem_environment(params),
+        score_mode,
+        snippets[score_mode],
+    )
+
+
 def problem_environment(params: DashboardParams) -> dict[str, str]:
     if params.problem_type == "circle_packing":
         return {"PACKING_N": str(params.packing_n), "SCORE_MODE": params.score_mode}

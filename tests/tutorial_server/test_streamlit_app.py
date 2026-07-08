@@ -62,3 +62,13 @@ def test_recent_subprocess_output_is_brief():
 
     assert "job.recent_output[-8:]" in source
     assert "job.recent_output[-30:]" not in source
+
+
+def test_selected_score_function_is_shown_below_best_source():
+    source = Path("tutorial/server/streamlit_app.py").read_text()
+
+    best_source_index = source.index('st.expander("Best source code"')
+    score_function_index = source.index('st.expander("Selected score function"')
+
+    assert "score_function_preview" in source
+    assert best_source_index < score_function_index

@@ -360,6 +360,11 @@ participant default:
 7. status, queue position, score history, visualization, log tail 확인
 ```
 
+`Problem` 선택은 submit form 밖에 있으므로 선택 즉시 problem-specific parameter와 score
+function 목록이 바뀐다. 예를 들어 `tsp`를 고르면 `TSP_N`, `TSP_SEED`,
+`TSP_SCORE_MODE`만 보이고, `no_isosceles`를 고르면 `NOISO_N`,
+`NOISO_SCORE_MODE`만 보인다.
+
 `Auto refresh`는 기본적으로 꺼져 있다. 외부 공유 링크나 프록시를 통해 접속하는
 환경에서는 browser-level refresh가 Streamlit form 입력을 제출 전에 초기화할 수
 있으므로, job을 제출하기 전에는 켜지 않는다. job 제출 후 진행 상황만 볼 때 켜거나,
@@ -386,6 +391,9 @@ cancelled:
 
 Dashboard는 top-level `best/` 대신 진행 중에는 `checkpoints/checkpoint_*`를 본다.
 `checkpoint_interval: 1`이므로 stable checkpoint가 생성될 때마다 화면이 갱신된다.
+Colab처럼 한 cell 안에서 출력이 streaming되는 구조는 아니지만, job 제출 후
+`Refresh now`를 누르거나 `Auto refresh`를 켜면 checkpoint 단위로 score table,
+score plot, visualization, best source code가 다시 렌더된다.
 
 ## 10. Troubleshooting
 

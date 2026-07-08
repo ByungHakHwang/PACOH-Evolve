@@ -134,10 +134,11 @@ def plot_solution(problem_type: str, data: dict, title: str):
 
 def render_submit_form(manager: JobManager):
     st.subheader("Submit Job")
-    with st.form("submit-job", clear_on_submit=False):
-        participant = st.text_input("Participant name or id", value="guest")
-        problem_type = st.selectbox("Problem", ["circle_packing", "tsp", "no_isosceles"])
+    participant = st.text_input("Participant name or id", value="guest", key="participant_id")
+    problem_type = st.selectbox("Problem", ["circle_packing", "tsp", "no_isosceles"], key="problem_type")
+    st.caption("Changing the problem updates the score and parameter options below.")
 
+    with st.form("submit-job", clear_on_submit=False):
         common_left, common_mid, common_right = st.columns(3)
         with common_left:
             iterations = st.selectbox("Iterations", ITERATION_OPTIONS, index=ITERATION_OPTIONS.index(2))

@@ -445,6 +445,10 @@ export OPENEVOLVE_MAX_ACTIVE_JOBS=1
 
 그리고 dashboard를 재시작한 뒤 `iterations=1`, `max_tokens=1024`로 smoke test한다.
 
+SSH 연결이 끊긴 뒤에도 Ollama가 계속 바쁘거나 새 job이 진행되지 않으면
+[운영 runbook](../../docs/tutorial-server-recovery.md)의 process 정리 절차를
+따른다.
+
 ### 입력 중 화면이 깜빡이거나 form 값이 초기화됨
 
 현재 dashboard는 browser-level meta refresh를 쓰지 않고 Streamlit autorefresh

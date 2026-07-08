@@ -360,6 +360,11 @@ participant default:
 7. status, queue position, score history, visualization, log tail 확인
 ```
 
+`Auto refresh`는 기본적으로 꺼져 있다. 외부 공유 링크나 프록시를 통해 접속하는
+환경에서는 browser-level refresh가 Streamlit form 입력을 제출 전에 초기화할 수
+있으므로, job을 제출하기 전에는 켜지 않는다. job 제출 후 진행 상황만 볼 때 켜거나,
+대신 `Refresh now` 버튼을 누른다.
+
 Job status 의미:
 
 ```text
@@ -414,6 +419,21 @@ export OPENEVOLVE_MAX_ACTIVE_JOBS=1
 ```
 
 그리고 dashboard를 재시작한 뒤 `iterations=1`, `max_tokens=1024`로 smoke test한다.
+
+### 입력 중 화면이 깜빡이거나 form 값이 초기화됨
+
+`Auto refresh`가 켜져 있으면 browser가 주기적으로 페이지를 reload한다. 외부 링크나
+reverse proxy 환경에서는 이 reload가 새 세션처럼 처리되어 form 값이 초기화될 수
+있다.
+
+대응:
+
+```text
+1. Auto refresh를 끈다.
+2. 화면이 한 번 더 reload될 수 있으므로 몇 초 기다린다.
+3. 참가자 정보와 parameter를 입력한 뒤 Start OpenEvolve를 누른다.
+4. 제출 후에는 Refresh now 버튼을 사용하거나 Auto refresh를 다시 켠다.
+```
 
 ### evaluator import error
 

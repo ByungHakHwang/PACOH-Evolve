@@ -300,8 +300,12 @@ def main():
     st.title("OpenEvolve Tutorial Dashboard")
     st.caption("Server fallback: OpenEvolve and Ollama run on the server; participants use only this browser UI.")
 
-    if st.sidebar.checkbox("Auto refresh", value=True):
+    if st.sidebar.button("Refresh now"):
+        st.rerun()
+
+    if st.sidebar.checkbox("Auto refresh", value=False, key="auto_refresh"):
         seconds = st.sidebar.slider("Refresh seconds", min_value=3, max_value=30, value=5)
+        st.sidebar.caption("Keep this off while filling the submit form.")
         st.sidebar.markdown(f"<meta http-equiv='refresh' content='{seconds}'>", unsafe_allow_html=True)
 
     ok, payload = health_check(settings)
